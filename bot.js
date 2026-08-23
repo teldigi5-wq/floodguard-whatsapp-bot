@@ -1,0 +1,16 @@
+require("dotenv").config();
+const express=require("express"),QRCode=require("qrcode"),pino=require("pino"),fs=require("fs"),path=require("path");
+const {default:makeWASocket,DisconnectReason,useMultiFileAuthState,fetchLatestBaileysVersion}=require("@whiskeysockets/baileys");
+const {DATA_PATH}=require("./src/store"),{getLive,streamLive}=require("./src/firebase"),{commandReply,processLiveChange}=require("./src/floodguard");
+fs.mkdirSync(DATA_PATH,{recursive:true});const AUTH=path.join(DATA_PATH,"auth");fs.mkdirSync(AUTH,{recursive:true});
+const PORT=Number(process.env.PORT||8080),app=express();let qr=null,wa="STARTING",fb="STARTING",num=null,started=false;
+app.get("/",(_q,r)=>r.send(`<!doctype html><meta name=viewport content="width=device-width"><title>FloodGuard</title><style>body{font-family:Arial;background:#07131d;color:#eaf7ff;display:grid;place-items:center;min-height:100vh}.c{background:#0d2130;border-radius:24px;padding:32px;text-align:center;width:min(650px,88vw)}img{width:320px;max-width:90%;background:white;padding:12px;border-radius:18px}.s{display:inline-block;padding:8px 12px;margin:6px;background:#15384d;border-radius:30px}</style><div class=c><h1>🌊 FloodGuard</h1><div class=s>WhatsApp: ${wa}</div><div class=s>Firebase: ${fb}</div>${num?`<p>${num}</p>`:""}${qr?`<img src="${qr}"><p>WhatsApp → Linked Devices → Link a Device</p>`:""}<p>Send <b>menu</b> then <b>stats</b>.</p></div>`));
+app.get("/health",(_q,r)=>r.json({status:"ok",service:"FloodGuard WhatsApp Bot",whatsapp:wa,firebase:fb}));
+app.listen(PORT,"0.0.0.0",()=>console.log(`Open http://localhost:${PORT}`));
+function startFirebase(sock){if(started)return;started=true;const st=streamLive();st.on("connected",()=>{fb="CONNECTED";console.log("Firebase connected")});st.on("error",e=>{fb="RECONNECTING";console.error(e.message)});st.on("live",l=>processLiveChange(sock,l).catch(console.error))}
+const msgText=m=>m?.message?.conversation||m?.message?.extendedTextMessage?.text||m?.message?.imageMessage?.caption||"";
+async function start(){const {state,saveCreds}=await useMultiFileAuthState(AUTH),{version}=await fetchLatestBaileysVersion();const sock=makeWASocket({version,auth:state,logger:pino({level:"silent"}),printQRInTerminal:false,browser:["FloodGuard","Chrome","2.0.0"],markOnlineOnConnect:false,syncFullHistory:false});
+sock.ev.on("creds.update",saveCreds);
+sock.ev.on("connection.update",async u=>{if(u.qr){wa="WAITING_FOR_QR_SCAN";qr=await QRCode.toDataURL(u.qr,{width:360,margin:2});console.log(`QR ready: http://localhost:${PORT}`)}if(u.connection==="open"){wa="CONNECTED";qr=null;num=sock.user?.id||null;console.log("WhatsApp connected",num);startFirebase(sock)}if(u.connection==="close"){wa="DISCONNECTED";qr=null;const code=u.lastDisconnect?.error?.output?.statusCode;if(code!==DisconnectReason.loggedOut)setTimeout(start,3000);else console.log("Logged out; remove data/auth only for a fresh login.")}});
+sock.ev.on("messages.upsert",async ({messages,type})=>{if(type!=="notify")return;for(const m of messages){if(!m?.message||m.key.fromMe)continue;const jid=m.key.remoteJid;if(!jid||jid==="status@broadcast"||jid.endsWith("@g.us"))continue;const t=msgText(m).trim();if(!t)continue;try{await sock.sendMessage(jid,{text:await commandReply(jid,t,getLive)},{quoted:m})}catch(e){console.error(e)}}})}
+start().catch(console.error);

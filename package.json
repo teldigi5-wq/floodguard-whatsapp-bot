@@ -1,0 +1,20 @@
+{
+  "name": "floodguard-whatsapp-ec2",
+  "version": "2.0.0",
+  "private": true,
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "check": "node --check bot.js && node --check src/firebase.js && node --check src/floodguard.js && node --check src/store.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "6.7.24",
+    "dotenv": "^17.2.1",
+    "express": "^4.21.2",
+    "pino": "^9.9.0",
+    "qrcode": "^1.5.4"
+  }
+}

@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: FloodGuard WhatsApp Bot
+
+Parameters:
+  WhatsAppAccessToken: { Type: String, NoEcho: true }
+  WhatsAppPhoneNumberId: { Type: String }
+  WhatsAppVerifyToken: { Type: String, NoEcho: true }
+  MetaAppSecret: { Type: String, NoEcho: true }
+  FirebaseDatabaseUrl:
+    Type: String
+    Default: https://floodguard-e3215-default-rtdb.asia-southeast1.firebasedatabase.app
+  FirebaseServiceAccountJson: { Type: String, NoEcho: true }
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 15
+    MemorySize: 256
+    Environment:
+      Variables:
+        WHATSAPP_ACCESS_TOKEN: !Ref WhatsAppAccessToken
+        WHATSAPP_PHONE_NUMBER_ID: !Ref WhatsAppPhoneNumberId
+        WHATSAPP_VERIFY_TOKEN: !Ref WhatsAppVerifyToken
+        META_APP_SECRET: !Ref MetaAppSecret
+        FIREBASE_DATABASE_URL: !Ref FirebaseDatabaseUrl
+        FIREBASE_SERVICE_ACCOUNT_JSON: !Ref FirebaseServiceAccountJson
+        COUNTDOWN_FUNCTION_ARN: !GetAtt FloodGuardFunction.Arn
+        SCHEDULER_ROLE_ARN: !GetAtt SchedulerInvokeRole.Arn
+
+Resources:
+  FloodGuardFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: dist/src/handler.handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action: scheduler:CreateSchedule
+              Resource: "*"
+            - Effect: Allow
+              Action: iam:PassRole
+              Resource: !GetAtt SchedulerInvokeRole.Arn
+      Events:
+        Health:
+          Type: HttpApi
+          Properties: { Path: /health, Method: GET }
+        WebhookGet:
+          Type: HttpApi
+          Properties: { Path: /webhook, Method: GET }
+        WebhookPost:
+          Type: HttpApi
+          Properties: { Path: /webhook, Method: POST }
+        Monitor:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(1 minute)
+            Input: '{"kind":"monitor"}'
+
+  SchedulerInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeFloodGuard
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt FloodGuardFunction.Arn
+
+  AllowSchedulerInvoke:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref FloodGuardFunction
+      Principal: scheduler.amazonaws.com
+
+Outputs:
+  ApiUrl:
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}"
