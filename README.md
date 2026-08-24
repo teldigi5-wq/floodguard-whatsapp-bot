@@ -1,40 +1,73 @@
-# FloodGuard WhatsApp Bot — EC2 + QR
+# FloodGuard WhatsApp Bot v3
 
-Uses Baileys, Express, QR login, Firebase RTDB event streaming, PM2 and AWS EC2.
+Baileys + Firebase Realtime Database bot for the FloodGuard prototype.
 
-## Local Windows
-```powershell
+## Live contract
+
+Reads `/floodguard/live` and normalizes:
+- Water: `SAFE`, `WARNING`, `DANGER`, `SENSOR_ERROR`
+- Gate: `CLOSED`, `COUNTDOWN`, `OPEN`
+- Device: `ONLINE`, `OFFLINE`, `UNKNOWN`, `NOT_INSTALLED`
+
+Legacy `OPENING_WARNING` is accepted only as an input alias and normalized to `COUNTDOWN`.
+
+## Commands
+
+- `menu` / `help`
+- `stats`
+- `water`
+- `risk`
+- `gate`
+- `devices`
+- `rain`
+- `emergency`
+- `network`
+- `subscribe`
+- `unsubscribe`
+
+## Automatic alerts
+
+Subscribed users receive:
+- WARNING transition
+- DANGER transition
+- gate countdown start
+- countdown milestones at 10, 5, 3, 2, 1 seconds
+- gate OPEN
+- gate CLOSED after recovery
+- SAFE recovery
+- sensor-error notification
+
+Stale Firebase snapshots are never used to generate safety alerts.
+
+## Rain gauge
+
+Rain gauge is treated as planned/not installed until `devices.rainGauge` becomes `ONLINE`. The bot will not fabricate rainfall values.
+
+## Install / test
+
+```bash
 npm install
-copy .env.example .env
 npm run check
 npm start
 ```
-Open http://localhost:8080 and scan with WhatsApp → Linked Devices.
 
-Then send:
-- menu
-- stats
-- water
-- risk
-- gate
-- rain
-- devices
-- emergency
-- subscribe
-- unsubscribe
+Open port 8080 through your existing EC2/security-group setup if you use the QR status page remotely.
 
-Firebase stays at `/floodguard/live`. `distanceCm` means distance to water, not water depth.
-
-Alerts are transition-based. Countdown messages use the real Firebase `gate.countdownSeconds`; the bot does not create an independent countdown.
-
-## EC2
-Amazon Linux 2023, Node 20, PM2, one instance. Open SSH 22 from your IP and TCP 8080 from your IP while scanning the QR.
+## PM2
 
 ```bash
-chmod +x setup.sh
-REPO_URL=https://github.com/YOUR_USERNAME/YOUR_REPO.git ./setup.sh
-pm2 startup
+pm2 start ecosystem.config.js
+pm2 save
+pm2 logs floodguard-whatsapp-bot --lines 50
+```
+
+If PM2 already has the process:
+
+```bash
+pm2 restart floodguard-whatsapp-bot
 pm2 save
 ```
 
-Baileys uses the WhatsApp linked-device/web protocol, not the official Meta Cloud API.
+## Preserve WhatsApp login
+
+Keep the existing `data/auth` folder when updating the bot. Deleting it forces a new QR scan.
