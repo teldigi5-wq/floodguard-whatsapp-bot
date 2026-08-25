@@ -20,7 +20,6 @@ const AUTH = path.join(DATA_PATH, 'auth');
 fs.mkdirSync(AUTH, { recursive: true });
 
 const PORT = Number(process.env.PORT || 8080);
-const QR_DISPLAY_TTL_MS = Math.max(15000, Number(process.env.QR_DISPLAY_TTL_MS || 30000));
 const app = express();
 
 let qr = null;
@@ -41,19 +40,15 @@ app.get('/', (_req, res) => {
 
 app.get('/status', (_req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-  const qrExpired = Boolean(qr && qrGeneratedAt && Date.now() - qrGeneratedAt >= QR_DISPLAY_TTL_MS);
-
   res.json({
     status: 'ok',
     service: 'FloodGuard WhatsApp Bot',
     whatsapp: wa,
     firebase: fb,
     connectedNumber: num,
-    qr: qrExpired ? null : qr,
-    qrVersion: qrExpired ? null : qrVersion,
+    qr,
+    qrVersion,
     qrGeneratedAt,
-    qrTtlMs: QR_DISPLAY_TTL_MS,
-    qrExpired,
     lastError
   });
 });
@@ -104,7 +99,7 @@ async function start() {
     auth: state,
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
-    browser: ['FloodGuard', 'Chrome', '3.1.0'],
+    browser: ['FloodGuard', 'Chrome', '4.0.0'],
     markOnlineOnConnect: false,
     syncFullHistory: false
   });

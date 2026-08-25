@@ -1,0 +1,33 @@
+FloodGuard WhatsApp Bot v4 — FINAL QR SESSION UPDATE
+
+Correct session behavior
+- QR is only shown when a WhatsApp link is actually required.
+- After a successful QR scan, the saved /data/auth session is reused.
+- Normal network disconnects/reconnects do NOT clear auth and do NOT request a QR.
+- EC2/PM2 restarts reuse the saved session and do NOT request a QR.
+- If WhatsApp explicitly logs this linked device out, Baileys reports LOGGED_OUT.
+- Only then FloodGuard clears /data/auth and automatically starts a fresh link session.
+- Any new QR emitted by WhatsApp/Baileys automatically replaces the previous QR in the browser.
+- There is no fake 30-second QR timeout anymore.
+
+Final QR-only UI
+- Animated glass interface
+- subtle 3D pointer tilt
+- animated ambient lighting/grid
+- animated QR scan line
+- persistent-session reconnect screen
+- success animation and connected-device display
+- automatic browser status updates every second
+- no dashboard/sensor cards
+
+EC2 update
+cd ~/floodguard-whatsapp-bot
+git fetch origin
+git reset --hard origin/main
+npm install
+npm run check
+pm2 restart floodguard-whatsapp-bot --update-env
+pm2 save
+
+IMPORTANT
+Do not delete /data/auth during ordinary updates or network disconnects.
