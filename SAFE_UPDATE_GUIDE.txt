@@ -1,0 +1,42 @@
+FLOODGUARD PRESENTATION FINAL V7 — SAFE EC2 UPDATE
+
+IMPORTANT
+- DO NOT delete /data/auth
+- DO NOT overwrite your existing EC2 .env automatically
+- Keep the current WhatsApp linked-device session
+
+WINDOWS
+1. Extract these files over D:\floodguard-whatsapp-bot
+2. Run:
+   npm install
+   npm run check
+   git add .
+   git commit -m "FloodGuard Presentation Final v7"
+   git push origin main
+
+EC2
+1. SSH into EC2
+2. Run:
+   cd ~/floodguard-whatsapp-bot
+   git fetch origin
+   git reset --hard origin/main
+   npm ci --omit=dev || npm install --omit=dev
+   npm run check
+
+3. Your EC2 .env should contain:
+   PORT=8080
+   DATA_PATH=/data
+   FIREBASE_DATABASE_URL=https://floodguard-e3215-default-rtdb.asia-southeast1.firebasedatabase.app
+   FIREBASE_AUTH=
+   FLOODGUARD_STALE_MS=15000
+   WATER_SENSOR_TO_BOTTOM_CM=25
+
+4. Restart:
+   pm2 restart floodguard-whatsapp-bot --update-env
+   pm2 save
+   pm2 status
+
+5. Check:
+   pm2 logs floodguard-whatsapp-bot --lines 50
+
+Do not remove /data/auth unless WhatsApp explicitly logs the linked device out.

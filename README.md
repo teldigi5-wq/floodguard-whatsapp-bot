@@ -94,3 +94,10 @@ The EC2 page on port `8080` now updates automatically:
 - keeps the existing `/data/auth` session untouched.
 
 `QR_DISPLAY_TTL_MS=60000` controls only how long the web page displays a QR. It does not manufacture a replacement QR. The replacement still comes from the real Baileys/WhatsApp connection event.
+
+
+## FINAL WATER LEVEL RULES
+- Actual level < 8.5 cm: SAFE, gate CLOSED
+- 8.5 cm <= level < 11 cm: WARNING, gate CLOSED
+- level >= 11 cm: DANGER, real 10-second countdown, then OPEN 90°
+- Firebase uses water.levelCm for actual level and water.distanceCm for raw HC-SR04 air gap.

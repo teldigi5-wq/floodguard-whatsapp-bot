@@ -29,6 +29,7 @@ let wa = 'STARTING';
 let fb = 'STARTING';
 let num = null;
 let stream = null;
+let activeSock = null;
 let lastError = null;
 
 app.disable('x-powered-by');
@@ -70,7 +71,7 @@ app.get('/health', (_req, res) => res.json({
 
 app.listen(PORT, '0.0.0.0', () => console.log(`Open http://localhost:${PORT}`));
 
-function startFirebase(sock) {
+function startFirebase() {
   if (stream) return;
   stream = streamLive();
 
@@ -86,10 +87,15 @@ function startFirebase(sock) {
     console.error('Firebase:', e.message);
   });
 
-  stream.on('live', live => processLiveChange(sock, live).catch(error => {
-    lastError = `Alert processing: ${error.message}`;
-    console.error(error);
-  }));
+  // Always use the CURRENT WhatsApp socket. The bot may reconnect and create
+  // a new Baileys socket while the Firebase stream remains alive.
+  stream.on('live', live => {
+    if (!activeSock || wa !== 'CONNECTED') return;
+    processLiveChange(activeSock, live).catch(error => {
+      lastError = `Alert processing: ${error.message}`;
+      console.error(error);
+    });
+  });
 }
 
 const msgText = m =>
@@ -136,16 +142,18 @@ async function start() {
     }
 
     if (u.connection === 'open') {
+      activeSock = sock;
       wa = 'CONNECTED';
       qr = null;
       qrGeneratedAt = 0;
       num = sock.user?.id || null;
       lastError = null;
       console.log('WhatsApp connected', num);
-      startFirebase(sock);
+      startFirebase();
     }
 
     if (u.connection === 'close') {
+      if (activeSock === sock) activeSock = null;
       qr = null;
       qrGeneratedAt = 0;
       const code = u.lastDisconnect?.error?.output?.statusCode;

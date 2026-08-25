@@ -74,6 +74,8 @@ function streamLive() {
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
+          // Normalize CRLF so SSE blocks are detected reliably on all runtimes.
+          buffer = buffer.replace(/\r\n/g, '\n');
           let eventEnd;
 
           while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {

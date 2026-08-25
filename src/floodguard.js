@@ -32,16 +32,41 @@ function normalizeGate(live) {
   return 'UNKNOWN';
 }
 
+const WATER_SENSOR_TO_BOTTOM_CM = Number(process.env.WATER_SENSOR_TO_BOTTOM_CM || 25);
+const WARNING_LEVEL_CM = 8.5;
+const DANGER_LEVEL_CM = 11.0;
+
+function waterLevelCm(live) {
+  // The physical HC-SR04 air gap is the authoritative live measurement.
+  // Firebase multi-location PATCHes can briefly leave levelCm/status one event
+  // behind distanceCm, so derive the level from distance whenever available.
+  const distance = Number(live?.water?.distanceCm);
+  if (Number.isFinite(distance) && distance > 0) {
+    return Math.max(0, Math.min(WATER_SENSOR_TO_BOTTOM_CM, WATER_SENSOR_TO_BOTTOM_CM - distance));
+  }
+
+  const direct = Number(live?.water?.levelCm);
+  if (Number.isFinite(direct) && direct >= 0) {
+    return Math.max(0, Math.min(WATER_SENSOR_TO_BOTTOM_CM, direct));
+  }
+
+  return null;
+}
+
 function level(live) {
+  const cm = waterLevelCm(live);
+  if (Number.isFinite(cm)) {
+    if (cm >= DANGER_LEVEL_CM) return 'DANGER';
+    if (cm >= WARNING_LEVEL_CM) return 'WARNING';
+    return 'SAFE';
+  }
+
+  // Only fall back to the backend state when no trustworthy numeric reading
+  // is available. This prevents stale status + fresh distance mismatches.
   const s = upper(live?.water?.status);
   if (['SAFE', 'WARNING', 'DANGER'].includes(s)) return s;
   if (s === 'SENSOR_ERROR' || s === 'ERROR') return 'SENSOR_ERROR';
-
-  const d = Number(live?.water?.distanceCm);
-  if (!Number.isFinite(d) || d <= 0) return 'UNKNOWN';
-  if (d > 15) return 'SAFE';
-  if (d > 12) return 'WARNING';
-  return 'DANGER';
+  return 'UNKNOWN';
 }
 
 function risk(live) {
@@ -89,6 +114,7 @@ function deviceLines(live) {
     ['Arduino Uno', normalizeDevice(d.arduino)],
     ['ESP8266', esp],
     ['HC-SR04', normalizeDevice(d.ultrasonic)],
+    ['Rain Gauge', normalizeDevice(d.rainGauge)],
     ['RTC', normalizeDevice(d.rtc)],
     ['Servo', normalizeDevice(d.servo)],
   ];
@@ -125,7 +151,7 @@ function stats(live) {
 ${freshnessLine(live)}
 
 💧 Water: *${level(live)}*
-📏 Distance: ${v(live?.water?.distanceCm, ' cm')}
+💧 Water Level: ${v(waterLevelCm(live), ' cm')}
 🛡️ Flood Risk: *${risk(live)}*
 
 🚧 Gate: *${gate}*${gateExtra}
@@ -160,7 +186,7 @@ async function commandReply(jid, text, getLive) {
   if (!live) return '⚠️ FloodGuard live data is NOT AVAILABLE right now.';
 
   if (c === 'water') {
-    return `💧 *WATER LEVEL*\n\n${freshnessLine(live)}\n📏 Distance to Water: ${v(live?.water?.distanceCm, ' cm')}\nStatus: *${level(live)}*\n\nSmaller HC-SR04 distance means higher water.`;
+    return `💧 *WATER LEVEL*\n\n${freshnessLine(live)}\n💧 Actual Level: ${v(waterLevelCm(live), ' cm')}\n📏 HC-SR04 Air Gap: ${v(live?.water?.distanceCm, ' cm')}\nStatus: *${level(live)}*\n\nRules: SAFE <8.5 cm · WARNING 8.5–<11 cm · DANGER ≥11 cm.`;
   }
 
   if (['risk', 'flood'].includes(c)) {
@@ -175,13 +201,17 @@ async function commandReply(jid, text, getLive) {
 
   if (['rain', 'rainfall'].includes(c)) {
     if (!rainInstalled(live)) {
-      return '🌧️ *RAINFALL*\n\nRain Gauge: *PLANNED / NOT INSTALLED*\n\nFloodGuard will show real rainfall values after the physical rain gauge is added and calibrated. No fake rainfall value is reported.';
+      return `🌧️ *RAINFALL*\n\nRain Gauge: *${normalizeDevice(live?.devices?.rainGauge)}*\n\nReal collector sensor data is currently unavailable. No rainfall value is fabricated.`;
     }
-    return `🌧️ *RAINFALL*\n\nCurrent: ${v(live?.rain?.currentMm, ' mm')}\nDaily: ${v(live?.rain?.dailyMm, ' mm')}\nStatus: ${v(live?.rain?.status)}\n\n${freshnessLine(live)}`;
+    const depth = live?.rain?.waterDepthCm;
+    const raw = live?.rain?.rawValue;
+    const limited = live?.rain?.calibrationLimited === true;
+    const weight = live?.rain?.weightGrams;
+    return `🌧️ *RAINFALL*\n\nCurrent: ${v(live?.rain?.currentMm, ' mm')}\nAccumulated: ${v(live?.rain?.dailyMm, ' mm')}\nCategory: ${v(live?.rain?.status)}\nCollector depth: ${v(depth, ' cm')}\nSensor RAW: ${v(raw)}\nGauge weight: ${weight == null ? 'Unavailable (no load cell)' : v(weight, ' g')}\nCalibration: ${limited ? 'LIMITED - highest calibrated depth reached' : 'OK'}\n\n${freshnessLine(live)}`;
   }
 
   if (['devices', 'health'].includes(c)) {
-    return `🔧 *DEVICE HEALTH*\n\n${deviceLines(live)}\n\n🌧️ Rain Gauge: PLANNED\n💾 MicroSD: NOT INSTALLED\n📱 GSM: NOT INSTALLED`;
+    return `🔧 *DEVICE HEALTH*\n\n${deviceLines(live)}\n\n💾 MicroSD: NOT INSTALLED\n📱 GSM: NOT INSTALLED`;
   }
 
   if (['network', 'esp', 'wifi'].includes(c)) {
@@ -257,11 +287,11 @@ async function processLiveChange(sock, live) {
     const key = eventKey('level', live, `${previousLevel}->${currentLevel}`);
     if (key !== lastEventKey) {
       if (currentLevel === 'WARNING') {
-        await sendAll(sock, `🟡 *FLOODGUARD WARNING*\n\nWater has entered the warning zone.\n\n📏 Distance: ${v(live?.water?.distanceCm, ' cm')}\n💧 Status: WARNING\n🛡️ Risk: ${risk(live)}\n🚧 Gate: ${currentGate}`);
+        await sendAll(sock, `🟡 *FLOODGUARD WARNING*\n\nWater has entered the warning zone.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n💧 Status: WARNING\n🛡️ Risk: ${risk(live)}\n🚧 Gate: ${currentGate}`);
       } else if (currentLevel === 'DANGER') {
-        await sendAll(sock, `🚨 *FLOODGUARD DANGER*\n\nCritical water level detected.\n\n📏 Distance: ${v(live?.water?.distanceCm, ' cm')}\n🔴 Water: DANGER\n🛡️ Risk: ${risk(live)}\n🚨 Alarm: ${boolText(live?.alarm?.active)}\n\nFloodGuard is monitoring the gate-opening sequence.`);
+        await sendAll(sock, `🚨 *FLOODGUARD DANGER*\n\nCritical water level detected.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: DANGER\n🛡️ Risk: ${risk(live)}\n🚨 Alarm: ${boolText(live?.alarm?.active)}\n\nFloodGuard is monitoring the gate-opening sequence.`);
       } else if (currentLevel === 'SAFE' && ['WARNING', 'DANGER'].includes(previousLevel)) {
-        await sendAll(sock, `✅ *FLOODGUARD RECOVERY*\n\nWater conditions have returned to SAFE.\n\n📏 Distance: ${v(live?.water?.distanceCm, ' cm')}\n🚧 Gate: ${currentGate}\n🛡️ Risk: ${risk(live)}`);
+        await sendAll(sock, `✅ *FLOODGUARD RECOVERY*\n\nWater conditions have returned to SAFE.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: ${currentGate}\n🛡️ Risk: ${risk(live)}`);
       } else if (currentLevel === 'SENSOR_ERROR') {
         await sendAll(sock, '⚠️ *FLOODGUARD SENSOR ALERT*\n\nThe water sensor is not providing a valid reading. FloodGuard will not fabricate a water level.');
       }
@@ -272,7 +302,7 @@ async function processLiveChange(sock, live) {
   if (opening(live) && !procedureId) {
     procedureId = `gate-${Number(live?.system?.lastUpdate) || Date.now()}`;
     sentCountdown = [];
-    await sendAll(sock, `🚨 *DAM GATE OPENING WARNING*\n\nThe DANGER condition has started the gate countdown.\n\n⏱️ Opening in: ${v(countdown, ' seconds')}\n📏 Water Distance: ${v(live?.water?.distanceCm, ' cm')}\n🚧 Gate: COUNTDOWN`);
+    await sendAll(sock, `🚨 *DAM GATE OPENING WARNING*\n\nThe DANGER condition has started the gate countdown.\n\n⏱️ Opening in: ${v(countdown, ' seconds')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: COUNTDOWN`);
   }
 
   // Current physical countdown is 10 seconds, so send useful milestones only.
@@ -291,7 +321,7 @@ async function processLiveChange(sock, live) {
   }
 
   if (currentGate === 'OPEN' && previousGate !== 'OPEN') {
-    await sendAll(sock, `🚧 *FLOODGUARD DAM GATE OPEN*\n\nThe prototype dam gate is OPEN.\n\n📐 Servo Angle: ${v(live?.gate?.angle, '°')}\n📏 Water Distance: ${v(live?.water?.distanceCm, ' cm')}\n🔴 Water: ${currentLevel}\n🛡️ Risk: ${risk(live)}`);
+    await sendAll(sock, `🚧 *FLOODGUARD DAM GATE OPEN*\n\nThe prototype dam gate is OPEN.\n\n📐 Servo Angle: ${v(live?.gate?.angle, '°')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: ${currentLevel}\n🛡️ Risk: ${risk(live)}`);
     procedureId = null;
     sentCountdown = [];
   }
@@ -303,7 +333,7 @@ async function processLiveChange(sock, live) {
   }
 
   if (previousGate === 'OPEN' && currentGate === 'CLOSED') {
-    await sendAll(sock, `🔒 *DAM GATE CLOSED*\n\nThe prototype gate has returned to 0°.\n\n💧 Water: ${currentLevel}\n📏 Distance: ${v(live?.water?.distanceCm, ' cm')}`);
+    await sendAll(sock, `🔒 *DAM GATE CLOSED*\n\nThe prototype gate has returned to 0°.\n\n💧 Water: ${currentLevel}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}`);
   }
 
   saveState({

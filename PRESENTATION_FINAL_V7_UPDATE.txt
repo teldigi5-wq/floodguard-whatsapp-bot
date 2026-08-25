@@ -1,0 +1,11 @@
+FloodGuard WhatsApp Bot - Presentation Final V7
+
+Fixes:
+- HC-SR04 distanceCm is authoritative; actual water level = sensor height - air gap.
+- Final thresholds: SAFE <8.5 cm, WARNING 8.5 to <11 cm, DANGER >=11 cm.
+- Stale Firebase levelCm/status can no longer override a fresh distanceCm.
+- WhatsApp reconnects now update the active socket used by Firebase alert delivery.
+- Firebase SSE parser normalizes CRLF line endings.
+- Real rain data retained; weightGrams may be null/unavailable.
+- Gate states remain CLOSED / COUNTDOWN / OPEN; countdown milestones 10,5,3,2,1.
+- No fake sensor values are generated.

@@ -1,0 +1,45 @@
+FLOODGUARD WHATSAPP BOT - PRESENTATION FINAL V7
+
+FINAL WATER RULES
+SAFE:    actual water level < 8.5 cm
+WARNING: 8.5 cm <= level < 11 cm
+DANGER:  level >= 11 cm
+Gate opens only in DANGER after the real Firebase/Arduino countdown.
+
+IMPORTANT
+The bot now calculates actual water level from Firebase water.distanceCm first:
+level = WATER_SENSOR_TO_BOTTOM_CM - distanceCm
+Default WATER_SENSOR_TO_BOTTOM_CM=25.
+Set this in .env only if your physical sensor-to-bottom height is different.
+
+LOCAL CHECK
+npm install
+npm run check
+npm start
+
+EC2 UPDATE (if replacing files manually)
+1. Back up your existing data/auth folder. Do NOT delete it if WhatsApp is already linked.
+2. Replace bot.js, src/, package.json, package-lock.json, and supporting files with this package.
+3. Keep your existing .env and data/auth session.
+4. Add WATER_SENSOR_TO_BOTTOM_CM=25 to .env if it is not already there.
+5. Run:
+   npm ci --omit=dev || npm install --omit=dev
+   npm run check
+   pm2 restart floodguard-whatsapp-bot --update-env
+   pm2 save
+   pm2 status
+   pm2 logs floodguard-whatsapp-bot --lines 50
+
+TEST COMMANDS IN WHATSAPP
+stats
+water
+rain
+gate
+devices
+network
+subscribe
+
+Expected examples with 25 cm sensor height:
+distanceCm=17.0 -> level=8.0 -> SAFE
+distanceCm=15.0 -> level=10.0 -> WARNING
+distanceCm=14.0 -> level=11.0 -> DANGER
