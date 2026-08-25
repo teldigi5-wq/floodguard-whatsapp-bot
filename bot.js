@@ -45,12 +45,20 @@ app.get('/status', (_req, res) => {
     service: 'FloodGuard WhatsApp Bot',
     whatsapp: wa,
     firebase: fb,
-    connectedNumber: num,
-    qr,
-    qrVersion,
-    qrGeneratedAt,
+    connectedNumber: wa === 'CONNECTED' ? num : null,
+    hasQr: Boolean(qr),
+    qrVersion: qr ? qrVersion : null,
+    qrGeneratedAt: qr ? qrGeneratedAt : 0,
     lastError
   });
+});
+
+app.get('/qr', (_req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  if (!qr || wa !== 'WAITING_FOR_QR_SCAN') return res.sendStatus(404);
+  const match = /^data:image\/png;base64,(.+)$/.exec(qr);
+  if (!match) return res.sendStatus(404);
+  res.type('png').send(Buffer.from(match[1], 'base64'));
 });
 
 app.get('/health', (_req, res) => res.json({
@@ -110,6 +118,7 @@ async function start() {
     if (u.qr) {
       try {
         wa = 'WAITING_FOR_QR_SCAN';
+        num = null;
         qrGeneratedAt = Date.now();
         qrVersion += 1;
         qr = await QRCode.toDataURL(u.qr, {
@@ -143,6 +152,7 @@ async function start() {
       const loggedOut = code === DisconnectReason.loggedOut;
 
       wa = loggedOut ? 'LOGGED_OUT' : 'DISCONNECTED';
+      if (loggedOut) num = null;
       lastError = loggedOut
         ? 'WhatsApp logged out. A fresh link session is required.'
         : 'WhatsApp connection dropped. Reconnecting automatically…';

@@ -1,0 +1,19 @@
+FloodGuard v4.1 Stable QR UI fix
+
+Fixes:
+- No visible 1-second page refresh/flicker.
+- /status is lightweight and no longer sends the full base64 QR every poll.
+- Browser checks status every 2 seconds silently.
+- UI changes only when WhatsApp/Firebase/QR state actually changes.
+- QR image downloads only when qrVersion changes.
+- Connected number is cleared from status while logged out/re-linking.
+- Persistent /data/auth behavior remains unchanged.
+
+EC2 update:
+cd ~/floodguard-whatsapp-bot
+git fetch origin
+git reset --hard origin/main
+npm install
+npm run check
+pm2 restart floodguard-whatsapp-bot --update-env
+pm2 save
