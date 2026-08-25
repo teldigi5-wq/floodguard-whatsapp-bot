@@ -1,0 +1,20 @@
+PC (PowerShell):
+cd D:\floodguard-whatsapp-bot
+npm install
+npm run check
+git add .
+git commit -m "Update FloodGuard WhatsApp bot to v3"
+git push
+
+EC2:
+cd ~/floodguard-whatsapp-bot
+git pull origin main
+npm ci --omit=dev || npm install --omit=dev
+# Ensure .env has: FLOODGUARD_STALE_MS=15000
+npm run check
+pm2 restart floodguard-whatsapp-bot --update-env
+pm2 save
+pm2 status
+pm2 logs floodguard-whatsapp-bot --lines 50
+
+DO NOT DELETE /data OR /data/auth.

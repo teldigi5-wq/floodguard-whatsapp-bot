@@ -1,0 +1,20 @@
+FloodGuard QR UI v3.1
+
+New behavior:
+- Browser auto-updates every second.
+- New Baileys QR replaces the old QR automatically.
+- QR display countdown is shown.
+- Expired/stale QR is hidden while waiting for the next real QR.
+- After linking, page immediately shows:
+  WhatsApp Connected Successfully
+- WhatsApp and Firebase status pills update live.
+- Existing /data/auth is preserved.
+
+Optional .env:
+QR_DISPLAY_TTL_MS=60000
+
+After pushing to EC2:
+npm install
+npm run check
+pm2 restart floodguard-whatsapp-bot --update-env
+pm2 save

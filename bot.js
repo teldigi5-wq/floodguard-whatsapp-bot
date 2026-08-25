@@ -13,26 +13,50 @@ const {
 const { DATA_PATH } = require('./src/store');
 const { getLive, streamLive } = require('./src/firebase');
 const { commandReply, processLiveChange } = require('./src/floodguard');
+const { renderPage } = require('./src/webUi');
 
 fs.mkdirSync(DATA_PATH, { recursive: true });
 const AUTH = path.join(DATA_PATH, 'auth');
 fs.mkdirSync(AUTH, { recursive: true });
 
 const PORT = Number(process.env.PORT || 8080);
+const QR_DISPLAY_TTL_MS = Math.max(15000, Number(process.env.QR_DISPLAY_TTL_MS || 60000));
 const app = express();
+
 let qr = null;
+let qrGeneratedAt = 0;
+let qrVersion = 0;
 let wa = 'STARTING';
 let fb = 'STARTING';
 let num = null;
 let stream = null;
+let lastError = null;
 
-app.get('/', (_req, res) => res.send(`<!doctype html>
-<meta name="viewport" content="width=device-width">
-<title>FloodGuard Bot</title>
-<style>
-body{font-family:system-ui,Arial;background:#07131d;color:#eaf7ff;display:grid;place-items:center;min-height:100vh;margin:0}.c{background:#0d2130;border:1px solid #1c4259;border-radius:24px;padding:32px;text-align:center;width:min(650px,88vw);box-shadow:0 25px 80px #0008}.s{display:inline-block;padding:8px 12px;margin:6px;background:#15384d;border-radius:30px}img{width:320px;max-width:90%;background:#fff;padding:12px;border-radius:18px}code{color:#8de7ff}
-</style>
-<div class="c"><h1>🌊 FloodGuard Bot</h1><div class="s">WhatsApp: ${wa}</div><div class="s">Firebase: ${fb}</div>${num ? `<p>${num}</p>` : ''}${qr ? `<img src="${qr}"><p>WhatsApp → Linked Devices → Link a Device</p>` : ''}<p>Commands: <code>menu</code> · <code>stats</code> · <code>gate</code> · <code>devices</code></p></div>`));
+app.disable('x-powered-by');
+
+app.get('/', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.type('html').send(renderPage());
+});
+
+app.get('/status', (_req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  const qrExpired = Boolean(qr && qrGeneratedAt && Date.now() - qrGeneratedAt >= QR_DISPLAY_TTL_MS);
+
+  res.json({
+    status: 'ok',
+    service: 'FloodGuard WhatsApp Bot',
+    whatsapp: wa,
+    firebase: fb,
+    connectedNumber: num,
+    qr: qrExpired ? null : qr,
+    qrVersion: qrExpired ? null : qrVersion,
+    qrGeneratedAt,
+    qrTtlMs: QR_DISPLAY_TTL_MS,
+    qrExpired,
+    lastError
+  });
+});
 
 app.get('/health', (_req, res) => res.json({
   status: 'ok',
@@ -46,15 +70,23 @@ app.listen(PORT, '0.0.0.0', () => console.log(`Open http://localhost:${PORT}`));
 function startFirebase(sock) {
   if (stream) return;
   stream = streamLive();
+
   stream.on('connected', () => {
     fb = 'CONNECTED';
+    lastError = null;
     console.log('Firebase connected');
   });
+
   stream.on('error', e => {
     fb = 'RECONNECTING';
+    lastError = `Firebase: ${e.message}`;
     console.error('Firebase:', e.message);
   });
-  stream.on('live', live => processLiveChange(sock, live).catch(console.error));
+
+  stream.on('live', live => processLiveChange(sock, live).catch(error => {
+    lastError = `Alert processing: ${error.message}`;
+    console.error(error);
+  }));
 }
 
 const msgText = m =>
@@ -66,12 +98,13 @@ const msgText = m =>
 async function start() {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH);
   const { version } = await fetchLatestBaileysVersion();
+
   const sock = makeWASocket({
     version,
     auth: state,
     logger: pino({ level: 'silent' }),
     printQRInTerminal: false,
-    browser: ['FloodGuard', 'Chrome', '3.0.0'],
+    browser: ['FloodGuard', 'Chrome', '3.1.0'],
     markOnlineOnConnect: false,
     syncFullHistory: false
   });
@@ -80,25 +113,51 @@ async function start() {
 
   sock.ev.on('connection.update', async u => {
     if (u.qr) {
-      wa = 'WAITING_FOR_QR_SCAN';
-      qr = await QRCode.toDataURL(u.qr, { width: 360, margin: 2 });
-      console.log(`QR ready: http://localhost:${PORT}`);
+      try {
+        wa = 'WAITING_FOR_QR_SCAN';
+        qrGeneratedAt = Date.now();
+        qrVersion += 1;
+        qr = await QRCode.toDataURL(u.qr, {
+          width: 440,
+          margin: 2,
+          errorCorrectionLevel: 'M'
+        });
+        lastError = null;
+        console.log(`QR ready (v${qrVersion}): http://localhost:${PORT}`);
+      } catch (error) {
+        qr = null;
+        lastError = `QR generation: ${error.message}`;
+        console.error(lastError);
+      }
     }
 
     if (u.connection === 'open') {
       wa = 'CONNECTED';
       qr = null;
+      qrGeneratedAt = 0;
       num = sock.user?.id || null;
+      lastError = null;
       console.log('WhatsApp connected', num);
       startFirebase(sock);
     }
 
     if (u.connection === 'close') {
-      wa = 'DISCONNECTED';
       qr = null;
+      qrGeneratedAt = 0;
       const code = u.lastDisconnect?.error?.output?.statusCode;
-      if (code !== DisconnectReason.loggedOut) setTimeout(start, 3000);
-      else console.log('Logged out; remove data/auth only for a fresh login.');
+      const loggedOut = code === DisconnectReason.loggedOut;
+
+      wa = loggedOut ? 'LOGGED_OUT' : 'DISCONNECTED';
+      lastError = loggedOut
+        ? 'WhatsApp logged out. A fresh link session is required.'
+        : 'WhatsApp connection dropped. Reconnecting automatically…';
+
+      if (!loggedOut) {
+        console.log('WhatsApp disconnected; reconnecting in 3 seconds.');
+        setTimeout(start, 3000);
+      } else {
+        console.log('Logged out; remove data/auth only if you intentionally want a fresh login.');
+      }
     }
   });
 
@@ -109,6 +168,7 @@ async function start() {
       if (!m?.message || m.key.fromMe) continue;
       const jid = m.key.remoteJid;
       if (!jid || jid === 'status@broadcast' || jid.endsWith('@g.us')) continue;
+
       const text = msgText(m).trim();
       if (!text) continue;
 
@@ -117,10 +177,17 @@ async function start() {
         await sock.sendMessage(jid, { text: reply }, { quoted: m });
       } catch (e) {
         console.error('Command error:', e);
-        await sock.sendMessage(jid, { text: '⚠️ FloodGuard bot could not process that request right now.' }, { quoted: m }).catch(() => {});
+        await sock.sendMessage(
+          jid,
+          { text: '⚠️ FloodGuard bot could not process that request right now.' },
+          { quoted: m }
+        ).catch(() => {});
       }
     }
   });
 }
 
-start().catch(console.error);
+start().catch(error => {
+  lastError = `Startup: ${error.message}`;
+  console.error(error);
+});

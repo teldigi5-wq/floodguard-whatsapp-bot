@@ -1,1 +1,24 @@
-module.exports={apps:[{name:"floodguard-whatsapp-bot",script:"bot.js",instances:1,autorestart:true,watch:false,restart_delay:5000,max_restarts:20,max_memory_restart:"450M",env:{NODE_ENV:"production",PORT:8080,DATA_PATH:"/data"},out_file:"/data/logs/floodguard-out.log",error_file:"/data/logs/floodguard-error.log",merge_logs:true}]};
+module.exports = {
+  apps: [
+    {
+      name: "floodguard-whatsapp-bot",
+      script: "bot.js",
+      exec_mode: "fork",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      restart_delay: 5000,
+      max_restarts: 20,
+      max_memory_restart: "450M",
+      env: {
+        NODE_ENV: "production",
+        PORT: 8080,
+        DATA_PATH: "/data"
+      },
+      out_file: "/data/logs/floodguard-out.log",
+      error_file: "/data/logs/floodguard-error.log",
+      merge_logs: true,
+      log_date_format: "YYYY-MM-DD HH:mm:ss"
+    }
+  ]
+};
