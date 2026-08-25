@@ -1,0 +1,25 @@
+FloodGuard QR-only web update
+
+What changed
+- QR-only web page. No dashboard or sensor cards.
+- Modern animated glass UI with subtle 3D depth.
+- 30-second QR display timer.
+- Browser polls /status every second.
+- When WhatsApp/Baileys emits a new QR, it replaces the old QR automatically.
+- Expired QR is hidden while waiting for the next real QR.
+- When WhatsApp connects, page switches to:
+  WhatsApp Connected Successfully
+- If WhatsApp is explicitly logged out, the bot automatically clears only /data/auth
+  and starts a fresh QR login session.
+- Firebase/subscriber/state files under /data are not deleted.
+
+EC2 .env
+QR_DISPLAY_TTL_MS=30000
+
+Update commands on EC2
+cd ~/floodguard-whatsapp-bot
+git pull origin main
+npm install
+npm run check
+pm2 restart floodguard-whatsapp-bot --update-env
+pm2 save

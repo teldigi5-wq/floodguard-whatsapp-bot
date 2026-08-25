@@ -4,278 +4,301 @@ function renderPage() {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#07151f">
+  <meta name="theme-color" content="#050b12">
   <title>FloodGuard WhatsApp Link</title>
   <style>
     *{box-sizing:border-box}
     :root{
-      --bg:#06111a;
-      --panel:rgba(11,31,44,.80);
-      --panel2:rgba(15,43,59,.68);
-      --line:rgba(151,220,255,.14);
-      --text:#eef9ff;
-      --muted:#8eafc0;
-      --cyan:#56d8ff;
-      --green:#54e6a2;
-      --amber:#ffc868;
-      --red:#ff7187;
-      --shadow:0 35px 100px rgba(0,0,0,.42);
+      --bg:#050b12;
+      --panel:rgba(10,24,36,.72);
+      --panel2:rgba(12,31,45,.62);
+      --line:rgba(118,210,255,.16);
+      --text:#f3fbff;
+      --muted:#8eabba;
+      --cyan:#4fd6ff;
+      --blue:#4d7dff;
+      --green:#55e6a0;
+      --amber:#ffc766;
+      --red:#ff7088;
     }
-    html,body{min-height:100%}
+    html,body{min-height:100%;margin:0}
     body{
-      margin:0;
       font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       color:var(--text);
       background:
-        radial-gradient(circle at 18% 5%,rgba(39,175,226,.16),transparent 30%),
-        radial-gradient(circle at 85% 85%,rgba(35,230,151,.09),transparent 28%),
-        linear-gradient(145deg,#041019,#071823 55%,#05121a);
-      overflow-x:hidden;
-    }
-    body:before{
-      content:"";
-      position:fixed;inset:0;pointer-events:none;
-      background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
-      background-size:44px 44px;
-      mask-image:linear-gradient(to bottom,rgba(0,0,0,.7),transparent);
-    }
-    .shell{
-      min-height:100vh;
-      display:grid;
-      place-items:center;
-      padding:28px 16px;
-    }
-    .card{
-      width:min(760px,100%);
-      border:1px solid var(--line);
-      border-radius:32px;
-      background:linear-gradient(180deg,rgba(15,43,59,.88),rgba(7,25,36,.86));
-      box-shadow:var(--shadow);
-      backdrop-filter:blur(22px);
+        radial-gradient(circle at 15% 8%,rgba(39,168,255,.16),transparent 30%),
+        radial-gradient(circle at 85% 88%,rgba(77,125,255,.14),transparent 32%),
+        linear-gradient(145deg,#02070d,#07131d 55%,#050b12);
       overflow:hidden;
+    }
+    .grid{
+      position:fixed;inset:0;pointer-events:none;opacity:.38;
+      background-image:
+        linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);
+      background-size:42px 42px;
+      mask-image:radial-gradient(circle at center,#000 15%,transparent 82%);
+    }
+    .orb{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;opacity:.32;animation:float 9s ease-in-out infinite}
+    .orb.a{width:310px;height:310px;background:#0aa5ff;top:-100px;left:-80px}
+    .orb.b{width:260px;height:260px;background:#4a4dff;right:-70px;bottom:-70px;animation-delay:-3s}
+    @keyframes float{50%{transform:translate3d(0,24px,0) scale(1.08)}}
+    .wrap{min-height:100vh;display:grid;place-items:center;padding:20px;perspective:1200px}
+    .card{
+      width:min(560px,100%);
+      min-height:650px;
       position:relative;
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:34px;
+      background:
+        linear-gradient(180deg,rgba(15,39,56,.78),rgba(4,15,24,.84));
+      box-shadow:0 40px 120px rgba(0,0,0,.5),inset 0 1px rgba(255,255,255,.06);
+      backdrop-filter:blur(28px) saturate(135%);
+      transform-style:preserve-3d;
+      animation:enter .7s cubic-bezier(.2,.85,.25,1);
     }
-    .glow{
-      position:absolute;width:240px;height:240px;border-radius:50%;
-      background:rgba(77,210,255,.12);filter:blur(50px);
-      top:-120px;right:-70px;pointer-events:none;
+    @keyframes enter{from{opacity:0;transform:translateY(28px) rotateX(4deg) scale(.97)}to{opacity:1;transform:none}}
+    .shine{
+      position:absolute;inset:-40% -20%;pointer-events:none;
+      background:linear-gradient(115deg,transparent 42%,rgba(255,255,255,.055) 49%,transparent 56%);
+      transform:translateX(-45%);
+      animation:shine 8s ease-in-out infinite;
     }
-    .header{padding:30px 32px 18px;text-align:center;position:relative}
-    .brand{
-      width:64px;height:64px;margin:0 auto 14px;border-radius:20px;
-      display:grid;place-items:center;font-size:31px;
-      background:linear-gradient(145deg,rgba(64,205,255,.2),rgba(27,112,150,.12));
-      border:1px solid rgba(112,221,255,.2);
-      box-shadow:inset 0 1px rgba(255,255,255,.12);
+    @keyframes shine{55%,100%{transform:translateX(45%)}}
+    header{text-align:center;padding:34px 28px 16px;position:relative}
+    .logo{
+      width:68px;height:68px;margin:0 auto 15px;border-radius:23px;
+      display:grid;place-items:center;font-size:32px;
+      background:linear-gradient(145deg,rgba(79,214,255,.22),rgba(77,125,255,.12));
+      border:1px solid rgba(105,219,255,.2);
+      box-shadow:0 15px 50px rgba(36,169,255,.12),inset 0 1px rgba(255,255,255,.12);
+      transform:translateZ(35px);
     }
-    h1{font-size:clamp(25px,5vw,36px);margin:0;letter-spacing:-.7px}
-    .subtitle{margin:8px 0 0;color:var(--muted);font-size:14px}
-    .statusRow{display:flex;justify-content:center;gap:9px;flex-wrap:wrap;margin-top:20px}
-    .pill{
-      display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;
-      background:rgba(3,16,24,.42);border:1px solid var(--line);font-size:12px;color:#c8e4f0;
+    h1{margin:0;font-size:31px;letter-spacing:-.7px}
+    .sub{margin:8px 0 0;color:var(--muted);font-size:13px}
+    .status{
+      margin:17px auto 0;width:max-content;max-width:100%;
+      display:flex;align-items:center;gap:9px;padding:8px 13px;border-radius:999px;
+      background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.07);
+      color:#cbe2ec;font-size:12px;
     }
-    .dot{width:8px;height:8px;border-radius:50%;background:#64808e;box-shadow:0 0 0 4px rgba(100,128,142,.10)}
-    .dot.ok{background:var(--green);box-shadow:0 0 0 4px rgba(84,230,162,.10)}
-    .dot.wait{background:var(--amber);box-shadow:0 0 0 4px rgba(255,200,104,.10)}
-    .dot.bad{background:var(--red);box-shadow:0 0 0 4px rgba(255,113,135,.10)}
-    .content{padding:12px 32px 32px}
+    .dot{width:8px;height:8px;border-radius:50%;background:#6a8290;box-shadow:0 0 0 4px rgba(106,130,144,.09)}
+    .dot.wait{background:var(--amber);box-shadow:0 0 0 4px rgba(255,199,102,.10)}
+    .dot.ok{background:var(--green);box-shadow:0 0 0 4px rgba(85,230,160,.10)}
+    .dot.bad{background:var(--red);box-shadow:0 0 0 4px rgba(255,112,136,.10)}
+    .body{padding:14px 26px 28px}
     .stage{
-      border:1px solid var(--line);border-radius:26px;background:rgba(2,14,21,.36);
-      min-height:430px;padding:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
+      min-height:470px;border:1px solid rgba(255,255,255,.065);border-radius:27px;
+      background:linear-gradient(180deg,rgba(0,0,0,.16),rgba(0,0,0,.25));
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:25px 18px;text-align:center;position:relative;overflow:hidden;
     }
-    .qrFrame{
-      width:min(360px,88vw);aspect-ratio:1;background:white;border-radius:27px;padding:14px;
-      box-shadow:0 20px 70px rgba(0,0,0,.35),0 0 0 1px rgba(255,255,255,.3);
+    .scanGlow{
+      position:absolute;width:280px;height:280px;border-radius:50%;
+      background:radial-gradient(circle,rgba(67,201,255,.11),transparent 68%);
+      animation:pulse 2.4s ease-in-out infinite;pointer-events:none;
+    }
+    @keyframes pulse{50%{transform:scale(1.12);opacity:.65}}
+    .qrWrap{
+      position:relative;width:min(330px,78vw);aspect-ratio:1;border-radius:28px;padding:13px;
+      background:linear-gradient(145deg,#fff,#eef8ff);
+      box-shadow:0 26px 80px rgba(0,0,0,.42),0 0 50px rgba(79,214,255,.08);
+      transform:translateZ(45px);
       transition:opacity .25s,transform .25s;
     }
-    .qrFrame.refreshing{opacity:.28;transform:scale(.97)}
-    .qrFrame img{display:block;width:100%;height:100%;object-fit:contain;border-radius:15px}
-    .timerWrap{width:min(360px,88vw);margin:18px auto 0}
-    .timerTop{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);margin-bottom:8px}
-    .bar{height:7px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
-    .barFill{height:100%;width:100%;border-radius:inherit;background:linear-gradient(90deg,#4cd7ff,#5be3a7);transition:width .5s linear}
-    .instruction{font-size:16px;font-weight:700;margin:20px 0 6px}
-    .hint{font-size:13px;color:var(--muted);line-height:1.55;margin:0;max-width:470px}
-    .steps{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px}
-    .step{font-size:11px;padding:7px 10px;border-radius:11px;background:rgba(255,255,255,.045);color:#bcd5df}
-    .successIcon{
-      width:96px;height:96px;border-radius:50%;display:grid;place-items:center;font-size:50px;
-      background:radial-gradient(circle,rgba(84,230,162,.27),rgba(84,230,162,.08));
-      border:1px solid rgba(84,230,162,.35);box-shadow:0 0 55px rgba(84,230,162,.16);
-      animation:pop .45s cubic-bezier(.2,.9,.25,1.25);
+    .qrWrap.refreshing{opacity:.22;transform:scale(.965) translateZ(25px)}
+    .qrWrap img{width:100%;height:100%;display:block;border-radius:17px;object-fit:contain}
+    .scanLine{
+      position:absolute;left:18px;right:18px;height:2px;top:20%;
+      background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+      box-shadow:0 0 12px var(--cyan);opacity:.72;animation:scan 2.8s ease-in-out infinite;
     }
-    @keyframes pop{from{transform:scale(.55);opacity:0}to{transform:scale(1);opacity:1}}
-    .successTitle{font-size:28px;margin:20px 0 8px}
-    .successText{color:var(--muted);font-size:14px;line-height:1.6;max-width:500px;margin:0 auto}
-    .device{
-      margin-top:18px;padding:12px 15px;border-radius:15px;background:rgba(84,230,162,.06);
-      border:1px solid rgba(84,230,162,.14);font-family:ui-monospace,SFMono-Regular,Consolas,monospace;
-      font-size:12px;color:#bbf5da;word-break:break-all;
+    @keyframes scan{50%{top:78%}}
+    .timer{width:min(330px,78vw);margin-top:17px}
+    .timerTop{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-bottom:8px}
+    .timerTop strong{color:#dff7ff}
+    .track{height:7px;background:rgba(255,255,255,.07);border-radius:999px;overflow:hidden}
+    .fill{height:100%;width:100%;border-radius:inherit;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width .2s linear}
+    .title{font-size:19px;font-weight:800;margin:20px 0 7px}
+    .hint{margin:0;color:var(--muted);font-size:13px;line-height:1.6;max-width:400px}
+    .steps{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:15px}
+    .chip{padding:7px 9px;border-radius:10px;background:rgba(255,255,255,.045);font-size:10px;color:#b7d0dc}
+    .spinner{
+      width:74px;height:74px;border-radius:50%;
+      border:3px solid rgba(79,214,255,.12);border-top-color:var(--cyan);
+      box-shadow:0 0 35px rgba(79,214,255,.10);animation:spin .85s linear infinite;
     }
-    .waitingIcon{width:70px;height:70px;border-radius:50%;border:3px solid rgba(86,216,255,.15);border-top-color:var(--cyan);animation:spin .9s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .waitTitle{font-size:22px;margin:22px 0 8px}
-    .errorBox{margin-top:16px;color:#ffc1cb;font-size:12px;max-width:520px}
-    .footer{
-      padding:0 32px 27px;display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;
-      color:#66899a;font-size:11px;
+    .check{
+      width:102px;height:102px;border-radius:50%;display:grid;place-items:center;font-size:50px;
+      color:#dfffee;background:radial-gradient(circle,rgba(85,230,160,.28),rgba(85,230,160,.07));
+      border:1px solid rgba(85,230,160,.35);box-shadow:0 0 65px rgba(85,230,160,.14);
+      animation:success .55s cubic-bezier(.2,.9,.2,1.2);
     }
-    .footer strong{color:#8cb5c7;font-weight:600}
+    @keyframes success{from{opacity:0;transform:scale(.55) rotate(-8deg)}to{opacity:1;transform:none}}
+    .successTitle{font-size:26px;margin:22px 0 8px}
+    .device{
+      margin-top:18px;padding:10px 13px;border-radius:13px;
+      border:1px solid rgba(85,230,160,.14);background:rgba(85,230,160,.055);
+      color:#bdf4db;font:11px ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all;
+    }
     .hidden{display:none!important}
-    @media(max-width:560px){
-      .header{padding:25px 18px 14px}.content{padding:10px 14px 18px}.stage{padding:22px 13px;min-height:410px}.footer{padding:0 18px 20px;justify-content:center;text-align:center}
+    footer{text-align:center;padding:0 24px 24px;color:#5f7e8e;font-size:10px}
+    @media(max-width:520px){
+      body{overflow:auto}.wrap{padding:12px}.card{min-height:620px;border-radius:27px}
+      header{padding:28px 18px 13px}.body{padding:10px 13px 20px}.stage{min-height:440px;border-radius:22px}
+      .qrWrap,.timer{width:min(300px,82vw)}
     }
   </style>
 </head>
 <body>
-  <main class="shell">
-    <section class="card">
-      <div class="glow"></div>
-      <header class="header">
-        <div class="brand">🌊</div>
-        <h1>FloodGuard WhatsApp</h1>
-        <p class="subtitle">Secure linked-device setup for the FloodGuard monitoring bot</p>
-        <div class="statusRow">
-          <div class="pill"><span id="waDot" class="dot"></span><span id="waStatus">WhatsApp · Starting</span></div>
-          <div class="pill"><span id="fbDot" class="dot"></span><span id="fbStatus">Firebase · Starting</span></div>
-        </div>
-      </header>
+<div class="grid"></div><div class="orb a"></div><div class="orb b"></div>
+<main class="wrap">
+  <section class="card">
+    <div class="shine"></div>
+    <header>
+      <div class="logo">🌊</div>
+      <h1>FloodGuard</h1>
+      <p class="sub">WhatsApp secure device link</p>
+      <div class="status"><span id="statusDot" class="dot wait"></span><span id="statusText">Starting…</span></div>
+    </header>
+    <div class="body">
+      <div class="stage">
+        <div class="scanGlow"></div>
 
-      <div class="content">
-        <div class="stage">
-          <section id="qrView" class="hidden">
-            <div id="qrFrame" class="qrFrame"><img id="qrImage" alt="WhatsApp link QR code"></div>
-            <div class="timerWrap">
-              <div class="timerTop"><span>QR refresh</span><strong id="timerText">--</strong></div>
-              <div class="bar"><div id="timerBar" class="barFill"></div></div>
-            </div>
-            <p class="instruction">Scan with WhatsApp</p>
-            <p class="hint">Use the phone that should remain linked to the FloodGuard bot. This page automatically switches to the newest QR when WhatsApp issues one.</p>
-            <div class="steps">
-              <span class="step">1 · WhatsApp</span><span class="step">2 · Linked Devices</span><span class="step">3 · Link a Device</span><span class="step">4 · Scan QR</span>
-            </div>
-          </section>
+        <section id="qrView" class="hidden">
+          <div id="qrWrap" class="qrWrap">
+            <img id="qrImage" alt="WhatsApp QR code">
+            <div class="scanLine"></div>
+          </div>
+          <div class="timer">
+            <div class="timerTop"><span>QR refresh</span><strong id="timerText">30s</strong></div>
+            <div class="track"><div id="timerFill" class="fill"></div></div>
+          </div>
+          <div class="title">Scan to connect</div>
+          <p class="hint">Open WhatsApp on your phone and link this FloodGuard server as a device. A new QR appears automatically when WhatsApp issues one.</p>
+          <div class="steps">
+            <span class="chip">WhatsApp</span><span class="chip">Linked Devices</span><span class="chip">Link a Device</span><span class="chip">Scan</span>
+          </div>
+        </section>
 
-          <section id="successView" class="hidden">
-            <div class="successIcon">✓</div>
-            <h2 class="successTitle">WhatsApp Connected Successfully</h2>
-            <p class="successText">FloodGuard is linked and ready. The QR has been disabled because this server already has an authenticated WhatsApp session.</p>
-            <div id="deviceId" class="device"></div>
-          </section>
+        <section id="waitingView">
+          <div class="spinner"></div>
+          <div id="waitingTitle" class="title">Preparing QR…</div>
+          <p id="waitingText" class="hint">FloodGuard is creating a secure WhatsApp link. Keep this page open.</p>
+        </section>
 
-          <section id="waitingView">
-            <div class="waitingIcon"></div>
-            <h2 id="waitTitle" class="waitTitle">Starting FloodGuard…</h2>
-            <p id="waitText" class="hint">Waiting for WhatsApp to create a secure QR code.</p>
-            <div id="errorBox" class="errorBox hidden"></div>
-          </section>
-        </div>
+        <section id="connectedView" class="hidden">
+          <div class="check">✓</div>
+          <h2 class="successTitle">WhatsApp Connected Successfully</h2>
+          <p class="hint">FloodGuard is linked and ready. The QR is hidden while this WhatsApp session remains authenticated.</p>
+          <div id="device" class="device"></div>
+        </section>
       </div>
-
-      <footer class="footer">
-        <span>Page updates automatically · no manual refresh needed</span>
-        <span><strong>FloodGuard</strong> · EC2 + PM2</span>
-      </footer>
-    </section>
-  </main>
+    </div>
+    <footer>Auto-updating QR page · no manual refresh required</footer>
+  </section>
+</main>
 
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  let currentQrVersion = null;
   let latest = null;
+  let currentQrVersion = null;
 
-  function setView(name) {
+  const show = name => {
     $("qrView").classList.toggle("hidden", name !== "qr");
-    $("successView").classList.toggle("hidden", name !== "success");
     $("waitingView").classList.toggle("hidden", name !== "waiting");
-  }
+    $("connectedView").classList.toggle("hidden", name !== "connected");
+  };
 
-  function statusDot(el, status) {
-    el.className = "dot";
-    if (status === "CONNECTED") el.classList.add("ok");
-    else if (status.includes("WAIT") || status.includes("START") || status.includes("RECONNECT")) el.classList.add("wait");
-    else if (status.includes("DISCONNECT") || status.includes("LOGGED_OUT") || status.includes("ERROR")) el.classList.add("bad");
-  }
-
-  function pretty(s) {
-    return String(s || "UNKNOWN").replaceAll("_", " ").toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-  }
+  const setStatus = status => {
+    const dot = $("statusDot");
+    dot.className = "dot";
+    if (status === "CONNECTED") {
+      dot.classList.add("ok");
+      $("statusText").textContent = "WhatsApp connected";
+    } else if (status === "LOGGED_OUT" || status === "DISCONNECTED") {
+      dot.classList.add("bad");
+      $("statusText").textContent = status === "LOGGED_OUT" ? "Logged out · creating new QR" : "Reconnecting…";
+    } else {
+      dot.classList.add("wait");
+      $("statusText").textContent = status === "WAITING_FOR_QR_SCAN" ? "Waiting for QR scan" : "Preparing connection…";
+    }
+  };
 
   function render(data) {
     latest = data;
-    $("waStatus").textContent = "WhatsApp · " + pretty(data.whatsapp);
-    $("fbStatus").textContent = "Firebase · " + pretty(data.firebase);
-    statusDot($("waDot"), data.whatsapp || "");
-    statusDot($("fbDot"), data.firebase || "");
+    setStatus(data.whatsapp || "STARTING");
 
     if (data.whatsapp === "CONNECTED") {
-      setView("success");
-      $("deviceId").textContent = data.connectedNumber ? "Linked device: " + data.connectedNumber : "Linked device authenticated";
+      show("connected");
+      $("device").textContent = data.connectedNumber ? "Linked device: " + data.connectedNumber : "WhatsApp device linked";
       return;
     }
 
     if (data.qr && data.qrVersion) {
-      setView("qr");
+      show("qr");
       if (currentQrVersion !== data.qrVersion) {
         currentQrVersion = data.qrVersion;
-        $("qrFrame").classList.add("refreshing");
-        const preload = new Image();
-        preload.onload = () => {
+        $("qrWrap").classList.add("refreshing");
+        const img = new Image();
+        img.onload = () => {
           $("qrImage").src = data.qr;
-          $("qrFrame").classList.remove("refreshing");
+          $("qrWrap").classList.remove("refreshing");
         };
-        preload.src = data.qr;
+        img.src = data.qr;
       }
       return;
     }
 
-    setView("waiting");
-    const expired = data.qrExpired;
-    $("waitTitle").textContent = expired ? "QR expired — getting a new one…" :
-      data.whatsapp === "DISCONNECTED" ? "WhatsApp reconnecting…" :
-      data.whatsapp === "LOGGED_OUT" ? "WhatsApp session logged out" :
-      "Preparing secure QR…";
-    $("waitText").textContent = expired
-      ? "The old QR has been hidden. FloodGuard will show the next QR automatically as soon as WhatsApp issues it."
-      : "Keep this page open. It will update automatically.";
-    if (data.lastError) {
-      $("errorBox").textContent = data.lastError;
-      $("errorBox").classList.remove("hidden");
-    } else $("errorBox").classList.add("hidden");
+    show("waiting");
+    if (data.whatsapp === "LOGGED_OUT") {
+      $("waitingTitle").textContent = "Session logged out";
+      $("waitingText").textContent = "FloodGuard is clearing the expired session and generating a new QR automatically…";
+    } else if (data.qrExpired) {
+      $("waitingTitle").textContent = "Refreshing QR…";
+      $("waitingText").textContent = "The previous QR expired. Waiting for the next real QR from WhatsApp.";
+    } else if (data.whatsapp === "DISCONNECTED") {
+      $("waitingTitle").textContent = "Reconnecting…";
+      $("waitingText").textContent = "FloodGuard is reconnecting to WhatsApp automatically.";
+    } else {
+      $("waitingTitle").textContent = "Preparing QR…";
+      $("waitingText").textContent = "FloodGuard is creating a secure WhatsApp link. Keep this page open.";
+    }
   }
 
-  function updateTimer() {
-    if (!latest || !latest.qr || !latest.qrGeneratedAt || latest.whatsapp === "CONNECTED") return;
-    const ttl = latest.qrTtlMs || 60000;
+  function tick() {
+    if (!latest || !latest.qrGeneratedAt || latest.whatsapp === "CONNECTED") return;
+    const ttl = latest.qrTtlMs || 30000;
     const left = Math.max(0, ttl - (Date.now() - latest.qrGeneratedAt));
     const sec = Math.ceil(left / 1000);
     $("timerText").textContent = left > 0 ? sec + "s" : "Refreshing…";
-    $("timerBar").style.width = Math.max(0, Math.min(100, left / ttl * 100)) + "%";
-    if (left <= 0) {
-      setView("waiting");
-      $("waitTitle").textContent = "QR expired — getting a new one…";
-      $("waitText").textContent = "The expired QR is hidden. A fresh QR will appear here automatically.";
+    $("timerFill").style.width = Math.max(0, Math.min(100, left / ttl * 100)) + "%";
+    if (left <= 0 && latest.whatsapp !== "CONNECTED") {
+      show("waiting");
+      $("waitingTitle").textContent = "Refreshing QR…";
+      $("waitingText").textContent = "The previous QR expired. Waiting for the next real QR from WhatsApp.";
     }
   }
 
   async function poll() {
     try {
-      const r = await fetch("/status?_=" + Date.now(), { cache: "no-store" });
-      if (!r.ok) throw new Error("Status HTTP " + r.status);
-      render(await r.json());
-    } catch (e) {
-      $("waitTitle").textContent = "Connection to server interrupted";
-      $("waitText").textContent = "Trying again automatically…";
-      $("errorBox").textContent = e.message;
-      $("errorBox").classList.remove("hidden");
+      const res = await fetch("/status?_=" + Date.now(), {cache:"no-store"});
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      render(await res.json());
+    } catch {
+      setStatus("DISCONNECTED");
+      show("waiting");
+      $("waitingTitle").textContent = "Server connection interrupted";
+      $("waitingText").textContent = "Trying again automatically…";
     }
   }
 
   poll();
   setInterval(poll, 1000);
-  setInterval(updateTimer, 250);
+  setInterval(tick, 200);
 })();
 </script>
 </body>

@@ -20,7 +20,7 @@ const AUTH = path.join(DATA_PATH, 'auth');
 fs.mkdirSync(AUTH, { recursive: true });
 
 const PORT = Number(process.env.PORT || 8080);
-const QR_DISPLAY_TTL_MS = Math.max(15000, Number(process.env.QR_DISPLAY_TTL_MS || 60000));
+const QR_DISPLAY_TTL_MS = Math.max(15000, Number(process.env.QR_DISPLAY_TTL_MS || 30000));
 const app = express();
 
 let qr = null;
@@ -156,7 +156,14 @@ async function start() {
         console.log('WhatsApp disconnected; reconnecting in 3 seconds.');
         setTimeout(start, 3000);
       } else {
-        console.log('Logged out; remove data/auth only if you intentionally want a fresh login.');
+        console.log('WhatsApp logged out; clearing expired auth and generating a fresh QR automatically.');
+        try {
+          fs.rmSync(AUTH, { recursive: true, force: true });
+          fs.mkdirSync(AUTH, { recursive: true });
+        } catch (error) {
+          console.error('Could not reset WhatsApp auth:', error);
+        }
+        setTimeout(start, 1800);
       }
     }
   });
