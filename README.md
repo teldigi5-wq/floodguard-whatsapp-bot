@@ -2,80 +2,87 @@
 
 # 🌊 FloodGuard WhatsApp Bot
 
-### Real-time flood monitoring, alerts and cloud-connected emergency messaging
+### Real-time flood monitoring, cloud alerts and emergency-status messaging
 
 ![Node.js](https://img.shields.io/badge/Node.js-Bot-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-EC2-232F3E?style=for-the-badge&logo=amazonaws&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-RTDB-FFCA28?style=for-the-badge&logo=firebase&logoColor=111827)
 ![WhatsApp](https://img.shields.io/badge/WhatsApp-Baileys-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)
-![Status](https://img.shields.io/badge/status-active-0EA5E9?style=for-the-badge)
+![Arduino](https://img.shields.io/badge/Arduino-IoT-00878F?style=for-the-badge&logo=arduino&logoColor=white)
 
-**The cloud messaging layer of the FloodGuard flood-monitoring ecosystem.**
+**The cloud-notification layer of the FloodGuard IoT flood-monitoring ecosystem.**
 
 </div>
 
 ---
 
-## 🚨 What it does
+## 🎯 Project snapshot
 
-FloodGuard connects physical water-level sensing hardware to a cloud-hosted WhatsApp notification service.
+FloodGuard connects real water-level sensing hardware to Firebase and a cloud-hosted WhatsApp service so users can query system state and receive meaningful alerts when flood conditions change.
 
-The bot reads real live state from Firebase and turns it into human-readable monitoring commands, transition alerts and gate-status notifications.
+This repository focuses on the **monitoring and notification layer**. Physical gate control remains on the embedded controller side.
 
-> The bot **monitors and reports**. Physical gate control remains on the FloodGuard hardware/controller side.
+| Layer | Technology |
+|---|---|
+| Sensing | HC-SR04 ultrasonic sensor |
+| Controller | Arduino Uno |
+| Connectivity | ESP8266 |
+| Realtime backend | Firebase RTDB |
+| Messaging service | Node.js + Baileys |
+| Hosting | AWS EC2 + PM2 |
+| User channel | WhatsApp |
 
 ---
 
-## 🏗️ System architecture
+## 🏗️ End-to-end architecture
 
 ```mermaid
 flowchart LR
-    Sensor[HC-SR04 Sensor] --> Uno[Arduino Uno]
+    Sensor[HC-SR04] --> Uno[Arduino Uno]
     Uno --> ESP[ESP8266]
     ESP --> Firebase[Firebase RTDB]
     Firebase --> Bot[Node.js FloodGuard Bot]
-    Bot --> Baileys[Baileys]
-    Baileys --> WA[WhatsApp]
-    Uno --> Gate[Physical Gate Controller]
+    Bot --> WA[WhatsApp / Baileys]
+    Uno --> Gate[Servo / Gate Controller]
 ```
 
 ```text
-HC-SR04
+Water level
+   ↓
+HC-SR04 sensor
    ↓
 Arduino Uno
    ↓
 ESP8266
    ↓
-Firebase RTDB /floodguard/live
+Firebase RTDB
    ↓
-Node.js bot on AWS EC2
+AWS EC2 Node.js bot
    ↓
-Baileys
-   ↓
-WhatsApp alerts + monitoring commands
+WhatsApp commands + alerts
 ```
 
 ---
 
 ## ⚡ Core capabilities
 
-- Real Firebase RTDB monitoring
+- Real-time Firebase RTDB monitoring
 - `SAFE`, `WARNING`, `DANGER` and `SENSOR_ERROR` states
 - Transition-based warning and danger alerts
 - Recovery notifications
-- Gate countdown milestones
-- Gate open / closed notifications
-- Sensor-error reporting
+- Gate countdown milestones and gate-state reporting
 - Stale-data protection
-- ESP8266 network-status command
+- Sensor-error reporting
+- ESP8266/network-status reporting
 - Subscriber management
-- QR linking page with live connection state
-- Persistent WhatsApp linked-device authentication on EC2
+- QR-based WhatsApp device linking
+- Persistent authentication storage on EC2
+- PM2 process management
 - No fabricated sensor or rainfall readings
 
 ---
 
-## 💬 Commands
+## 💬 WhatsApp command surface
 
 | Command | Purpose |
 |---|---|
@@ -85,7 +92,7 @@ WhatsApp alerts + monitoring commands
 | `risk` | Current flood-risk state |
 | `gate` | Gate state / countdown |
 | `devices` | Device information |
-| `rain` | Rain-gauge state |
+| `rain` | Rain-gauge status |
 | `network` | ESP8266 / network status |
 | `emergency` | Emergency information |
 | `subscribe` | Subscribe to alerts |
@@ -93,42 +100,50 @@ WhatsApp alerts + monitoring commands
 
 ---
 
-## 🌊 Water-level logic
+## 🛡️ Reliability design
 
-| Actual water level | State | Gate |
-|---:|---|---|
-| `< 8.5 cm` | `SAFE` | `CLOSED` |
-| `8.5 cm – < 11 cm` | `WARNING` | `CLOSED` |
-| `≥ 11 cm` | `DANGER` | 10-second countdown → `OPEN` |
+### Stale data
 
-Firebase uses:
-
-- `water.levelCm` → actual calculated water level
-- `water.distanceCm` → raw HC-SR04 air-gap measurement
-
----
-
-## 🛡️ Reliability behavior
-
-### Stale-data protection
-
-`FLOODGUARD_STALE_MS` prevents old Firebase data from being treated as a current sensor reading.
+`FLOODGUARD_STALE_MS` prevents an old Firebase record from being presented as a fresh sensor reading.
 
 ### Sensor errors
 
-Invalid sensor data moves the system into `SENSOR_ERROR` rather than inventing a valid reading.
+Invalid or unavailable readings become `SENSOR_ERROR` instead of being converted into a fake safe/warning/danger value.
 
-### Alert transitions
+### Transition alerts
 
-Notifications are driven by meaningful state changes instead of repeatedly spamming the same alert on every database update.
+The bot responds to meaningful state transitions instead of spamming the same warning every time Firebase updates.
+
+### Authentication persistence
+
+The WhatsApp linked-device session is stored outside the source tree so application updates do not force a new QR scan every time.
+
+---
+
+## 🔄 Data flow
+
+Firebase exposes live FloodGuard state under the project data path. The bot converts that state into user-facing status and alerts.
+
+Important values include:
+
+```text
+water.levelCm      calculated water level
+water.distanceCm   raw ultrasonic air-gap distance
+gate               current gate state
+alarm              alarm state
+esp8266            network/device state
+system             overall system state
+```
+
+The bot treats Firebase as the live communication boundary between the embedded hardware and the cloud messaging service.
 
 ---
 
 ## ☁️ AWS EC2 deployment
 
-The production bot is designed to run under **PM2** on AWS EC2.
+The production service is intended to run under **PM2** on AWS EC2.
 
-### Environment
+### Example environment
 
 ```env
 PORT=8080
@@ -138,7 +153,7 @@ FIREBASE_AUTH=
 FLOODGUARD_STALE_MS=15000
 ```
 
-> Never commit real secrets, credentials or authentication data to the repository.
+> Never commit production secrets, credentials, `.env` files or WhatsApp authentication data.
 
 ### Install / update
 
@@ -151,18 +166,18 @@ pm2 restart floodguard-whatsapp-bot --update-env
 pm2 save
 ```
 
-Useful checks:
+### Health checks
 
 ```bash
 pm2 status
 pm2 logs floodguard-whatsapp-bot --lines 50
 ```
 
-Expected healthy logs include WhatsApp and Firebase connection confirmation.
+Healthy operation should show successful WhatsApp and Firebase connectivity.
 
 ---
 
-## 🔐 Preserve WhatsApp authentication
+## 🔐 Preserve linked-device authentication
 
 Production uses:
 
@@ -173,35 +188,62 @@ DATA_PATH=/data
 
 **Do not delete `/data` or `/data/auth` during deployment.**
 
-Those files preserve the linked-device session so the server does not require a new QR scan after every update.
+Keeping authentication outside the repository allows source updates without destroying the linked WhatsApp session.
 
 ---
 
 ## 📱 QR setup page
 
-The setup page on the configured HTTP port:
+The setup page can:
 
-- checks connection status automatically
-- displays newly generated QR codes
-- hides expired display QR codes
-- shows a waiting state while WhatsApp generates a replacement
-- switches to a connected state after successful linking
-- displays WhatsApp and Firebase status
+- poll connection state automatically
+- display newly generated QR codes
+- hide expired displayed codes
+- show a waiting state while WhatsApp generates the next QR
+- switch to a connected state after linking
+- expose WhatsApp and Firebase connection status
 
-`QR_DISPLAY_TTL_MS` controls display lifetime only. New QR codes still come from the real WhatsApp/Baileys connection flow.
+`QR_DISPLAY_TTL_MS` controls display lifetime only; new QR values still originate from the real Baileys/WhatsApp connection process.
 
 ---
 
-## 🧩 FloodGuard ecosystem
+## 🌐 FloodGuard ecosystem
 
-This repository is one component of a larger project that includes:
+This repository is one part of a larger system that includes:
 
-- Arduino-based flood sensing
+- embedded water-level sensing
+- Arduino control logic
 - ESP8266 connectivity
-- Firebase real-time data
+- Firebase real-time synchronization
 - automated gate behavior
-- mobile / web monitoring interfaces
-- cloud-hosted notification services
+- buzzer / LED / LCD alerts
+- mobile and web monitoring interfaces
+- AWS-hosted WhatsApp notifications
+
+That full path makes FloodGuard useful as a portfolio example of **IoT → cloud → user communication** rather than just an isolated bot.
+
+---
+
+## 💼 What this project demonstrates
+
+- embedded-to-cloud system integration
+- realtime database consumption
+- event/state transition design
+- reliability around stale and invalid sensor data
+- Node.js service deployment
+- process management with PM2
+- persistent authentication handling
+- messaging UX for an IoT system
+
+---
+
+## 🗺️ Next upgrades
+
+- [ ] Add automated tests around state transitions and stale-data behavior
+- [ ] Add structured health/readiness endpoints for deployment monitoring
+- [ ] Add screenshots of the QR setup page and WhatsApp command responses
+- [ ] Add a complete FloodGuard architecture diagram spanning hardware, Firebase, web, mobile and messaging
+- [ ] Add versioned releases and deployment notes
 
 ---
 
