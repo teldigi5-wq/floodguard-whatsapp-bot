@@ -1,0 +1,47 @@
+name: FloodGuard CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: floodguard-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax and source validation
+        run: npm run check
+
+      - name: Verify required project files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f bot.js
+          test -f src/firebase.js
+          test -f src/floodguard.js
+          test -f src/store.js
+          test -f src/webUi.js
+          test -f package.json
+          echo "FloodGuard project structure verified."
