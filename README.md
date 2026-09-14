@@ -9,6 +9,7 @@
 ![Firebase](https://img.shields.io/badge/Firebase-RTDB-FFCA28?style=for-the-badge&logo=firebase&logoColor=111827)
 ![WhatsApp](https://img.shields.io/badge/WhatsApp-Baileys-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)
 ![Arduino](https://img.shields.io/badge/Arduino-IoT-00878F?style=for-the-badge&logo=arduino&logoColor=white)
+[![FloodGuard CI](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/actions/workflows/ci.yml)
 
 **The cloud-notification layer of the FloodGuard IoT flood-monitoring ecosystem.**
 
@@ -31,6 +32,21 @@ This repository focuses on the **monitoring and notification layer**. Physical g
 | Messaging service | Node.js + Baileys |
 | Hosting | AWS EC2 + PM2 |
 | User channel | WhatsApp |
+
+---
+
+## ✅ Validation and deployment
+
+FloodGuard now separates **code validation** from **production deployment**.
+
+The CI workflow runs on pushes and pull requests and verifies the project with Node.js 20, a clean `npm ci` install, the repository's syntax/source checks, and required-file validation before changes are treated as healthy.
+
+Production deployment remains handled by the dedicated EC2 workflow, which updates the running service and preserves the deployment model independently from pull-request validation.
+
+This gives the repository two clear signals:
+
+- **CI** — proves the source tree is syntactically valid and structurally complete on a clean runner.
+- **Deployment** — updates the AWS EC2 service after accepted changes reach `main`.
 
 ---
 
@@ -234,6 +250,7 @@ That full path makes FloodGuard useful as a portfolio example of **IoT → cloud
 - process management with PM2
 - persistent authentication handling
 - messaging UX for an IoT system
+- separation of CI validation from production deployment
 
 ---
 
