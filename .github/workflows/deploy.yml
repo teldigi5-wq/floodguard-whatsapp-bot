@@ -30,7 +30,7 @@ jobs:
 
       - name: Deploy to EC2
         if: steps.config.outputs.configured == 'true'
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ env.EC2_HOST }}
           username: ec2-user
