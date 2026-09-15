@@ -1,16 +1,43 @@
 name: Deploy FloodGuard to EC2
+
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_KEY: ${{ secrets.EC2_KEY }}
+
     steps:
-      - uses: appleboy/ssh-action@v1.2.2
+      - name: Check EC2 deployment configuration
+        id: config
+        shell: bash
+        run: |
+          if [[ -n "$EC2_HOST" && -n "$EC2_KEY" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "EC2 deployment credentials are configured."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::EC2 deployment skipped because EC2_HOST and/or EC2_KEY are not configured in repository Actions secrets."
+          fi
+
+      - name: Deploy to EC2
+        if: steps.config.outputs.configured == 'true'
+        uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ secrets.EC2_HOST }}
+          host: ${{ env.EC2_HOST }}
           username: ec2-user
-          key: ${{ secrets.EC2_KEY }}
+          key: ${{ env.EC2_KEY }}
+          port: 22
+          timeout: 30s
+          command_timeout: 10m
           script: |
             set -e
             cd ~/floodguard-whatsapp-bot
