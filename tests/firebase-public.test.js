@@ -50,3 +50,66 @@ test('malformed, private and prototype-polluting paths are rejected',()=>{
  assert.throws(()=>applyEvent({},'water','put',{path:'/__proto__',data:'x'}),/Unsafe/);
  assert.throws(()=>applyEvent({},'water','put',{path:'relative',data:10}),/Invalid/);
 });
+
+
+test('bot receives coherent streamed readings, fragmented CRLF and incremental SSE updates',async()=>{
+ const originalFetch=global.fetch;
+ const {streamLive}=require('../src/firebase');
+ const {ReadableStream}=require('node:stream/web');
+ const textEncoder=new TextEncoder();
+ const controllers=new Map(),called=[];
+ const observations={
+   water:{levelCm:9.65,distanceCm:15.35,status:'WARNING'},
+   rain:{currentMm:0,dailyMm:0,status:'NORMAL'},
+   gate:{angle:0,status:'CLOSED',countdownSeconds:0},
+   alarm:{active:false,type:'NONE'},
+   devices:{arduino:'ONLINE',esp8266:'ONLINE'},
+   system:{lastUpdate:1720000000000,overallRisk:'MODERATE'},
+   'esp8266/connection':'CONNECTED','esp8266/rssi':-61,'esp8266/status':'ONLINE'
+ };
+ // A final "\r\n" split across chunks used to prevent SSE block detection.
+ function fragmentedEvent(eventName,packet){
+   const data='event: '+eventName+'\r\ndata: '+JSON.stringify(packet)+'\r\n\r\n';
+   return [data.slice(0,-1),data.slice(-1)].map(x=>textEncoder.encode(x));
+ }
+ global.fetch=async (url,options)=>{
+   called.push(url);
+   assert.equal(options.headers.Accept,'text/event-stream');
+   const branch=PUBLIC_PATHS.find(path=>url.includes('/floodguard/live/'+path+'.json'));
+   assert.ok(branch,'disallowed Firebase fetch '+url);
+   const body=new ReadableStream({
+     start(controller){
+       controllers.set(branch,controller);
+       for(const bytes of fragmentedEvent('put',{path:'/',data:observations[branch]}))
+         controller.enqueue(bytes);
+     }
+   });
+   return {ok:true,status:200,body};
+ };
+ let monitor;
+ const nextSnapshot=()=>new Promise((resolve,reject)=>{
+   const timer=setTimeout(()=>reject(new Error('No coherent SSE snapshot received')),2500);
+   monitor.once('live',snapshot=>{clearTimeout(timer);resolve(snapshot);});
+ });
+ try{
+   monitor=streamLive();
+   monitor.on('error',error=>{ throw error; });
+   const first=await nextSnapshot();
+   assert.equal(called.length,PUBLIC_PATHS.length);
+   assert.equal(first.water.levelCm,9.65);
+   assert.equal(first.esp8266.status,'ONLINE');
+   assert.ok(!Object.hasOwn(first.esp8266,'ip'));
+   assert.ok(!Object.hasOwn(first.esp8266,'wifi'));
+   for(const url of called)assert.ok(!url.includes('/floodguard/live.json'));
+   const secondPromise=nextSnapshot();
+   for(const bytes of fragmentedEvent('patch',{path:'/',data:{levelCm:10.25}}))
+     controllers.get('water').enqueue(bytes);
+   const next=await secondPromise;
+   assert.equal(next.water.levelCm,10.25);
+   assert.equal(next.gate.status,'CLOSED');
+ }finally{
+   if(monitor)monitor.stop();
+   for(const controller of controllers.values()){try{controller.close();}catch{}}
+   global.fetch=originalFetch;
+ }
+});
