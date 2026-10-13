@@ -276,3 +276,9 @@ That full path makes FloodGuard useful as a portfolio example of **IoT → cloud
 ### Cross-repository emulator acceptance (not a live rollout)
 
 The new `Firebase bot contract — safe child streams` GitHub Action uses the candidate rules from a **pinned public website commit**, starts a local RTDB Emulator, and verifies `getLive()` and `streamLive()` using synthetic readings with test-only ESP8266 private values. It must pass before a real EC2 deployment is considered. It never contacts production Firebase or sends WhatsApp messages.
+
+### Supervised EC2 rollout only
+
+The review PR also changes the GitHub Actions EC2 deployment trigger from automatic `main` pushes to **manual `workflow_dispatch` only**. Once merged and tested, an operator must select the specific reviewed 40-character commit SHA, choose `DEPLOY`, and run the workflow. It refuses to deploy if the remote `main` SHA differs, or if necessary EC2 secrets are missing. The job targets the `floodguard-ec2-production` GitHub environment; configure required reviewers/environment protections separately if desired.
+
+**While this change is still in the draft PR, the production `main` branch retains its existing automatic deploy trigger. Do not merge other changes to bot `main` before this is approved.**
