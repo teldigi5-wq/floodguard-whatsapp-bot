@@ -1,0 +1,43 @@
+name: Firebase bot contract — safe child streams
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/firebase.js'
+      - 'tests/firebase-*.test.js'
+      - '.github/workflows/firebase-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firebase-contract:
+    name: Verify bot against reviewed Phase A RTDB Emulator rules
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout WhatsApp bot branch
+        uses: actions/checkout@v4
+      - name: Checkout pinned, reviewed FloodGuard candidate rules
+        uses: actions/checkout@v4
+        with:
+          repository: teldigi5-wq/floodguard-website
+          ref: 660eb5a9f52b58fee03a14eb2a1c03449ae8985c
+          path: firebase-rules
+          sparse-checkout: |
+            firebase.phase-a.json
+            docs/firebase/phase-a-privacy-candidate.rules.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Setup Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Validate emulator-to-bot compatibility without production credentials
+        working-directory: firebase-rules
+        run: npx --yes firebase-tools@14.18.0 emulators:exec --only database --project demo-floodguard --config firebase.phase-a.json "node ../tests/firebase-emulator-contract.test.js"

@@ -271,3 +271,8 @@ That full path makes FloodGuard useful as a portfolio example of **IoT → cloud
 **Built by Poojana Kaveesh as part of the FloodGuard project.**
 
 </div>
+
+
+### Cross-repository emulator acceptance (not a live rollout)
+
+The new `Firebase bot contract — safe child streams` GitHub Action uses the candidate rules from a **pinned public website commit**, starts a local RTDB Emulator, and verifies `getLive()` and `streamLive()` using synthetic readings with test-only ESP8266 private values. It must pass before a real EC2 deployment is considered. It never contacts production Firebase or sends WhatsApp messages.
