@@ -282,3 +282,7 @@ The new `Firebase bot contract — safe child streams` GitHub Action uses the ca
 The review PR also changes the GitHub Actions EC2 deployment trigger from automatic `main` pushes to **manual `workflow_dispatch` only**. Once merged and tested, an operator must select the specific reviewed 40-character commit SHA, choose `DEPLOY`, and run the workflow. It refuses to deploy if the remote `main` SHA differs, or if necessary EC2 secrets are missing. The job targets the `floodguard-ec2-production` GitHub environment; configure required reviewers/environment protections separately if desired.
 
 **While this change is still in the draft PR, the production `main` branch retains its existing automatic deploy trigger. Do not merge other changes to bot `main` before this is approved.**
+
+### Hardware offline, telemetry last recorded
+
+The Arduino and ESP8266 are **already flashed and were working correctly**, according to the owner; the hardware is currently offline and unavailable for remote testing. **Do not reflash or restart the gate to validate this bot.** Firebase can remain connected even when its last sensor update is old. The bot must show historical measurements as **last recorded**, never infer live hardware from a Firebase connection, and must not issue automatic flood/gate alerts from expired or invalid timestamps. Offline UI changes can be tested with synthetic source values while EC2 deployment remains owner-approved and manual-only on this draft PR.
