@@ -62,3 +62,10 @@ test('rendered Hosting Settings browser script parses as JavaScript',()=>{
   assert.ok(match,'embedded browser script is missing');
   assert.doesNotThrow(()=>new Script(match[1]));
 });
+
+test('optional EC2 PM2 config advertises correct host mode and private loopback',()=>{
+  const ec2=require('../ecosystem.config.js');
+  assert.equal(ec2.apps[0].env.FLOODGUARD_HOST_MODE,'ec2');
+  assert.equal(ec2.apps[0].env.HOST,'127.0.0.1');
+  assert.equal(ec2.apps[0].instances,1);
+});
