@@ -286,3 +286,11 @@ The review PR also changes the GitHub Actions EC2 deployment trigger from automa
 ### Hardware offline, telemetry last recorded
 
 The Arduino and ESP8266 are **already flashed and were working correctly**, according to the owner; the hardware is currently offline and unavailable for remote testing. **Do not reflash or restart the gate to validate this bot.** Firebase can remain connected even when its last sensor update is old. The bot must show historical measurements as **last recorded**, never infer live hardware from a Firebase connection, and must not issue automatic flood/gate alerts from expired or invalid timestamps. Offline UI changes can be tested with synthetic source values while EC2 deployment remains owner-approved and manual-only on this draft PR.
+
+### Private WhatsApp setup access (draft migration requirement)
+
+The link/setup page `/`, `/status`, and `/qr` contain sensitive device-linking or diagnostic information. The draft update requires a private, random `FLOODGUARD_SETUP_TOKEN` (minimum 32 printable ASCII characters). Browsers authenticate with an HTTP **Basic Auth** prompt: username `admin`, password the secret token. The existing page, status polling and QR-image requests continue to use browser same-origin credentials. Tokens in query strings or URLs do not work. No WhatsApp QR values or phone identifiers are printed in public health responses.
+
+**Deployment prerequisite:** provision the secret in the **EC2 process environment** (not GitHub, not the repository, not browser JavaScript) and confirm the local admin UI through an **HTTPS-only** reverse proxy or an authenticated private tunnel. Basic Auth MUST NOT be used over plaintext public HTTP; do not expose port 8080 directly to the Internet. Enforce EC2 ingress allowlists, TLS and request rate limiting upstream. The public `/health` endpoint is limited to generic service liveness. If the token is not configured or too weak, setup routes return HTTP 503 rather than exposing WhatsApp QR data. Preserve `DATA_PATH/auth`; a rollout must not destroy the linked WhatsApp session.
+
+**Current production remains unchanged.** This behavior exists only in draft PR #12 until owner-approved supervised deployment. Confirm actual EC2 firewall, proxy, health checks, and environment configuration before merging or running the exact-SHA manual deploy.
