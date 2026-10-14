@@ -1,4 +1,4 @@
-function renderPage() {
+function renderPage({demoMode = false} = {}) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -41,6 +41,15 @@ function renderPage() {
     .hostingGuide{white-space:pre-line;font-size:12px;line-height:1.75;color:#b6d7e6;padding:12px;background:rgba(10,25,40,.8);border-radius:13px;border:1px solid var(--line)}
     .hostingNote{color:#ffc861;font-size:11px;line-height:1.55}
     @media(max-width:540px){.hostingSettings{margin:0 13px 16px}.hostingMetrics{grid-template-columns:1fr}}
+
+    .demoRisk{padding:9px 14px;border-radius:999px;border:1px solid rgba(255,200,97,.4);color:#ffc861;background:rgba(255,200,97,.08);font-size:11px;font-weight:800;letter-spacing:.05em}
+    .demoStack{display:grid;gap:13px;width:100%;max-width:415px;text-align:left}
+    .demoFields{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+    .demoField{padding:13px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.04)}
+    .demoField span{display:block;color:#91b6c9;font-size:11px;margin-bottom:6px}
+    .demoField strong{font-size:16px;color:#d7f4ff}
+    .demoInfo{color:#91b6c9;font-size:11px;line-height:1.6;text-align:center}
+    @media(max-width:540px){.demoFields{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -51,6 +60,27 @@ function renderPage() {
 <section id="qrView" class="view hidden"><div id="qrShell" class="qrShell"><img id="qrImage" alt="WhatsApp QR code"><div class="scan"></div></div><div class="fresh"><i></i><span>Current WhatsApp QR</span></div><div class="title">Scan once to link FloodGuard</div><p class="hint">After the first successful scan, FloodGuard keeps the saved session. Normal network drops and EC2 restarts reconnect without asking for another QR.</p><div class="chips"><span class="chip">WhatsApp</span><span class="chip">Linked Devices</span><span class="chip">Link a Device</span><span class="chip">Scan QR</span></div></section>
 <section id="waitingView" class="view"><div class="spinner"></div><div id="waitingTitle" class="title">Restoring WhatsApp session…</div><p id="waitingText" class="hint">No QR is needed unless WhatsApp has actually logged this linked device out.</p></section>
 <section id="connectedView" class="view hidden"><div class="check">✓</div><h2 class="successTitle">WhatsApp Connected Successfully</h2><p class="hint">The persistent FloodGuard WhatsApp session is authenticated and active.</p><div id="device" class="device"></div></section>
+<section id="demoView" class="view hidden" aria-label="Offline simulation preview">
+  <div class="demoStack">
+    <div style="text-align:center"><span class="demoRisk">SIMULATION ONLY · NO LIVE DATA</span></div>
+    <h2 class="title" style="text-align:center;margin:4px 0">Offline FloodGuard Preview</h2>
+    <p class="hint" style="text-align:center">WhatsApp pairing, Firebase connections and Arduino/ESP8266 control are disabled in this preview. Nothing here sends alerts or operates the gate.</p>
+    <label for="demoScenario" class="hostingLabel">Simulated sensor scenario</label>
+    <select class="hostingSelect" id="demoScenario">
+      <option value="offline" selected>Offline — no sensor readings</option>
+      <option value="safe">SAFE (synthetic)</option>
+      <option value="warning">WARNING (synthetic)</option>
+      <option value="danger">DANGER (synthetic)</option>
+    </select>
+    <div class="demoFields">
+      <div class="demoField"><span>Simulation state</span><strong id="demoLevel">OFFLINE</strong></div>
+      <div class="demoField"><span>Example water level</span><strong id="demoWater">NOT AVAILABLE</strong></div>
+      <div class="demoField"><span>Example gate indication</span><strong id="demoGate">NOT AVAILABLE</strong></div>
+      <div class="demoField"><span>Alerts sent</span><strong>NONE (disabled)</strong></div>
+    </div>
+    <p class="demoInfo" aria-live="polite" id="demoExplanation">No current measurements. The already-flashed hardware does not need to be online to preview this interface.</p>
+  </div>
+</section>
 </div></div>
 <details id="hostingSettings" class="hostingSettings">
   <summary><span>Hosting settings</span><span class="hostingRight"><span id="hostingActive">Checking active profile…</span></span></summary>
@@ -73,6 +103,7 @@ function renderPage() {
 <script>
 (() => {
   const $ = id => document.getElementById(id);
+  const launchedAsDemo = ${demoMode ? 'true' : 'false'};
   let activeView = null;
   let lastSignature = '';
   let currentQrVersion = null;
@@ -84,14 +115,31 @@ function renderPage() {
     $("qrView").classList.toggle("hidden", name !== "qr");
     $("waitingView").classList.toggle("hidden", name !== "waiting");
     $("connectedView").classList.toggle("hidden", name !== "connected");
+    $("demoView").classList.toggle("hidden", name !== "demo");
   }
+
+  const scenarios = {
+    offline:{level:'OFFLINE',water:'NOT AVAILABLE',gate:'NOT AVAILABLE',note:'No live data: historical Firebase readings must never be presented as current.'},
+    safe:{level:'SAFE · SYNTHETIC',water:'4.0 cm (simulated)',gate:'CLOSED (simulated)',note:'A synthetic SAFE visualization only; no real sensor data has been read.'},
+    warning:{level:'WARNING · SYNTHETIC',water:'9.0 cm (simulated)',gate:'CLOSED (simulated)',note:'This is a synthetic warning example; WhatsApp alert delivery is disabled.'},
+    danger:{level:'DANGER · SYNTHETIC',water:'12.0 cm (simulated)',gate:'COUNTDOWN (simulated)',note:'Simulated danger visualization only. No gate countdown, servo movement or real alert occurs.'}
+  };
+  function renderDemoScenario() {
+    const scenario = scenarios[$('demoScenario').value] || scenarios.offline;
+    $('demoLevel').textContent=scenario.level;
+    $('demoWater').textContent=scenario.water;
+    $('demoGate').textContent=scenario.gate;
+    $('demoExplanation').textContent=scenario.note;
+  }
+  $('demoScenario').addEventListener('change',renderDemoScenario);
+  renderDemoScenario();
 
   function updateStatus(status) {
     const dot = $("dot");
     const text = $("statusText");
-    const className = status === 'CONNECTED' ? 'dot ok' : status === 'WAITING_FOR_QR_SCAN' ? 'dot wait' : status === 'LOGGED_OUT' ? 'dot bad' : 'dot wait';
+    const className = status === 'CONNECTED' ? 'dot ok' : status === 'DEMO_MODE' ? 'dot wait' : status === 'WAITING_FOR_QR_SCAN' ? 'dot wait' : status === 'LOGGED_OUT' ? 'dot bad' : 'dot wait';
     if (dot.className !== className) dot.className = className;
-    const label = status === 'CONNECTED' ? 'WhatsApp connected' : status === 'WAITING_FOR_QR_SCAN' ? 'QR scan required' : status === 'LOGGED_OUT' ? 'Session logged out · preparing QR' : status === 'DISCONNECTED' ? 'Reconnecting saved session…' : 'Restoring saved session…';
+    const label = status === 'CONNECTED' ? 'WhatsApp connected' : status === 'DEMO_MODE' ? 'Offline demo · pairing disabled' : status === 'WAITING_FOR_QR_SCAN' ? 'QR scan required' : status === 'LOGGED_OUT' ? 'Session logged out · preparing QR' : status === 'DISCONNECTED' ? 'Reconnecting saved session…' : 'Restoring saved session…';
     if (text.textContent !== label) text.textContent = label;
   }
 
@@ -110,10 +158,14 @@ function renderPage() {
   }
 
   function apply(data) {
-    const signature = [data.whatsapp, data.firebase, data.connectedNumber || '', data.hasQr ? '1' : '0', data.qrVersion || '', data.lastError || ''].join('|');
+    const signature = [data.whatsapp, data.firebase, data.connectedNumber || '', data.hasQr ? '1' : '0', data.qrVersion || '', data.lastError || '', data.demoMode ? 'demo' : 'live'].join('|');
     if (signature === lastSignature) return; // absolutely no visual work when state did not change
     lastSignature = signature;
     updateStatus(data.whatsapp || 'STARTING');
+    if (data.demoMode === true && data.whatsapp === 'DEMO_MODE') {
+      show('demo');
+      return;
+    }
 
     if (data.whatsapp === 'CONNECTED') {
       show('connected');
@@ -208,8 +260,9 @@ function renderPage() {
   $('hostingProfile').addEventListener('change', renderHostingGuide);
   loadHostingSettings();
 
+  if (launchedAsDemo) { show('demo'); updateStatus('DEMO_MODE'); }
   poll();
-  setInterval(poll, 2000); // silent background check; UI changes only on actual state changes
+  if (!launchedAsDemo) setInterval(poll, 2000); // demo never needs continual server polling
 })();
 </script>
 </body></html>`;

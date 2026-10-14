@@ -39,4 +39,13 @@ jobs:
           ./scripts/setup-windows.ps1
           $after = (Get-FileHash '.env' -Algorithm SHA256).Hash
           if ($before -ne $after) { throw 'Windows setup unexpectedly overwrote existing settings' }
+          # Offline demo works without WhatsApp QR, Firebase or physical hardware.
+          $headers = @{ Authorization = 'Basic ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(('admin:' + (($settings -split "`n" | Where-Object { $_ -match '^FLOODGUARD_SETUP_TOKEN=' } | Select-Object -First 1) -replace '^FLOODGUARD_SETUP_TOKEN=','').Trim()))) }
+          $proc = Start-Process -FilePath 'node' -ArgumentList 'scripts/start-demo.js' -PassThru -NoNewWindow
+          try {
+            Start-Sleep -Seconds 3
+            $result = Invoke-RestMethod -Uri 'http://127.0.0.1:8085/status' -Headers $headers
+            if ($result.whatsapp -ne 'DEMO_MODE' -or $result.hasQr -ne $false) { throw 'Unexpected live WhatsApp status from offline demo' }
+            try { Invoke-WebRequest -Uri 'http://127.0.0.1:8085/qr' -Headers $headers -ErrorAction Stop; throw 'Offline demo unexpectedly exposes a QR' } catch { if ($_.Exception.Response.StatusCode.value__ -ne 404) { throw } }
+          } finally { if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force } }
           Write-Host 'Windows PC setup smoke tests passed (no secrets printed).'

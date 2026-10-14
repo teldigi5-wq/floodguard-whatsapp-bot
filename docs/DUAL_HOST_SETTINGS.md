@@ -28,3 +28,7 @@ The Arduino and ESP8266 were already flashed and worked correctly according to t
 ## Offline readiness check
 
 Run `npm run doctor` after setting up the private `.env` and the durable data directory, before launching the bot. The check does not access WhatsApp, Firebase or physical FloodGuard devices and never prints credentials or absolute paths. It checks the selected PC/EC2 mode, Node version, private setup token format, localhost-only admin binding, secure RTDB URL syntax, storage accessibility, and stale-data threshold. Missing old WhatsApp session files trigger a **warning**, not a failure; pairing may still be necessary. A passed preflight does **not** certify online service, HTTPS proxy or durable volume behavior.
+
+## Offline preview without pairing WhatsApp
+
+Run the Windows setup helper once, `npm run doctor`, then `npm run start:demo`. Open `http://127.0.0.1:8085` on the same machine, authenticate with your existing private admin token, and use the synthetic SAFE/WARNING/DANGER/Offline scenarios. This is an isolated Express server: no Baileys connection, QR pairing, Firebase request, WhatsApp alert or gate action is possible. To stop it, press Ctrl+C. Keep the real bot stopped until you decide to connect WhatsApp.

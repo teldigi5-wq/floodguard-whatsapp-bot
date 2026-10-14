@@ -5,11 +5,12 @@
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
-    "check": "node --check bot.js && node --check src/firebase.js && node --check src/floodguard.js && node --check src/store.js && node --check src/webUi.js && node --check src/adminAccess.js && node --check src/hosting.js && node --check scripts/start-profile.js && node --check src/preflight.js && node --check scripts/doctor.js",
-    "test": "node --test tests/firebase-public.test.js tests/deploy-workflow-policy.test.js tests/offline-freshness.test.js tests/admin-access.test.js tests/hosting-portability.test.js tests/dual-host-settings.test.js tests/preflight.test.js",
+    "check": "node --check bot.js && node --check src/firebase.js && node --check src/floodguard.js && node --check src/store.js && node --check src/webUi.js && node --check src/adminAccess.js && node --check src/hosting.js && node --check scripts/start-profile.js && node --check src/preflight.js && node --check scripts/doctor.js && node --check src/demoServer.js && node --check scripts/start-demo.js",
+    "test": "node --test tests/firebase-public.test.js tests/deploy-workflow-policy.test.js tests/offline-freshness.test.js tests/admin-access.test.js tests/hosting-portability.test.js tests/dual-host-settings.test.js tests/preflight.test.js tests/demo-mode.test.js",
     "start:pc": "node scripts/start-profile.js pc",
     "start:ec2": "node scripts/start-profile.js ec2",
-    "doctor": "node scripts/doctor.js"
+    "doctor": "node scripts/doctor.js",
+    "start:demo": "node scripts/start-demo.js"
   },
   "engines": {
     "node": ">=20.0.0"

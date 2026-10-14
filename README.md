@@ -48,6 +48,24 @@ The bot consumes **allowlisted Firebase child telemetry paths**. It provides the
 
 The PC setup is the recommended recovery path while the old AWS account/host is unavailable. Neither option requires reflashing the working Arduino or ESP8266.
 
+### Offline preview — no WhatsApp pairing required
+
+If you **do not want to link WhatsApp yet**, you can inspect the premium FloodGuard administration UI and select simulated SAFE/WARNING/DANGER/Offline states using an isolated local server. This preview does not import or initialize WhatsApp/Baileys, connect to Firebase, use real telemetry, or perform hardware/gate actions. It contains **no QR pairing** and sends **no alerts**.
+
+After checking out the reviewed draft branch on your Windows PC:
+
+```powershell
+npm ci
+npm test
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
+npm run doctor
+npm run start:demo
+```
+
+Open `http://127.0.0.1:8085` **on that same PC** and enter your local admin username `admin` and the private `FLOODGUARD_SETUP_TOKEN` value from `.env`. The page visibly displays **SIMULATION ONLY · NO LIVE DATA** and lets you switch synthetic scenarios. Stop the preview with `Ctrl+C`.
+
+**Do not run `npm run start:pc` or `npm run start:ec2` until you actually want to link WhatsApp.** Those are real bot processes. No change is required to the already-flashed Arduino/ESP8266.
+
 ### 1. Windows PC — first installation
 
 **Prerequisites:** Windows 10/11, [Node.js 20+](https://nodejs.org/), [Git](https://git-scm.com/), internet access, and a phone authorized to link the WhatsApp account. Your PC must remain powered on and connected while you want the bot to respond.
