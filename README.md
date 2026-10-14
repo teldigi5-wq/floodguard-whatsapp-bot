@@ -71,6 +71,9 @@ npm test
 # Existing .env is NOT overwritten.
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
 
+# Offline readiness check: never connects to WhatsApp or Firebase.
+npm run doctor
+
 # Starts the one local WhatsApp bot instance.
 npm run start:pc
 ```
@@ -82,6 +85,8 @@ The setup helper sets `FLOODGUARD_HOST_MODE=pc`, binds the admin page to `127.0.
 If a legitimate **private backup** of the old WhatsApp `auth/` directory exists, preserve and restore it only while the bot is stopped. If no backup is available from the unavailable AWS host, use the authorized phone to scan a **new QR code**. GitHub source code does not contain the old WhatsApp login.
 
 **Stop:** press `Ctrl+C` in the running terminal. **Start again:** run `npm run start:pc` in the project directory. Do not run a second bot instance against the same `data/auth` directory.
+
+**Preflight check:** `npm run doctor` performs an offline, read-only review of Node.js version, the PC/EC2 profile, loopback-only admin binding, token format, RTDB HTTPS-origin syntax, a usable data directory and stale-data threshold. It does **not** connect to Firebase, WhatsApp or the Arduino. `PASS` means only the local configuration is structurally ready—not that pairing, firewall/TLS setup, online telemetry or persistent cloud storage has been verified. Missing previous WhatsApp session data is a warning, not a code failure. The check never prints token values or private paths.
 
 ### 2. Required private settings
 
@@ -123,6 +128,9 @@ chmod 600 .env
 **Privately edit `.env`** before starting. Set `FLOODGUARD_HOST_MODE=ec2`, `HOST=127.0.0.1`, your verified persistent `DATA_PATH`, and a fresh random `FLOODGUARD_SETUP_TOKEN` (at least 32 printable characters). The example file deliberately does **not** contain a real token. Ensure the chosen service account can read/write the data directory; do not put private auth on an ephemeral filesystem.
 
 ```bash
+# Check configuration locally before any network connection:
+npm run doctor
+
 # First do a supervised foreground smoke test:
 npm run start:ec2
 
@@ -164,7 +172,7 @@ The optional EC2 profile does **not** deploy itself. A future VM, its billing, p
 ### Deployment checklist
 
 - [ ] Node.js 20+, Git, internet and the chosen hosting account/machine available
-- [ ] Correct branch/commit checked out and `npm test` passed
+- [ ] Correct branch/commit checked out; `npm test` and `npm run doctor` passed
 - [ ] Private `.env` configured, admin setup token strong, data directory persistent
 - [ ] One bot instance only; QR interface loopback-only or protected by SSH tunnel / HTTPS
 - [ ] Authorized WhatsApp pairing and `menu` / `stats` smoke test completed

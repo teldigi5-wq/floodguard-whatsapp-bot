@@ -33,6 +33,8 @@ jobs:
           if ($settings -notmatch '(?m)^FLOODGUARD_HOST_MODE=pc\r?$') { throw 'Wrong Windows profile' }
           if ($settings -notmatch '(?m)^HOST=127\.0\.0\.1\r?$') { throw 'Windows admin listener not loopback' }
           if ($settings -notmatch '(?m)^FLOODGUARD_SETUP_TOKEN=[A-F0-9]{64}\r?$') { throw 'Windows random setup token missing or weak' }
+          npm run doctor
+          if ($LASTEXITCODE -ne 0) { throw 'Offline readiness preflight did not pass' }
           $before = (Get-FileHash '.env' -Algorithm SHA256).Hash
           ./scripts/setup-windows.ps1
           $after = (Get-FileHash '.env' -Algorithm SHA256).Hash

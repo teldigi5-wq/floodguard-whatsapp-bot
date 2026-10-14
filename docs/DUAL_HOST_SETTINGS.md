@@ -11,7 +11,7 @@ Use FLOODGUARD_HOST_MODE=pc or ec2 inside each host's private .env. The same bot
 1. Install Node.js >=20 and Git on your PC. Clone the reviewed repository and enter its directory.
 2. Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-windows.ps1
 3. The script creates a private .env, random admin token and ./data directory if absent; an existing .env is never overwritten. Keep .env and data/auth away from GitHub, email and public files.
-4. Run: npm ci ; npm test ; npm run start:pc
+4. Run: npm ci ; npm test ; npm run doctor ; npm run start:pc
 5. Open http://127.0.0.1:8080 on the SAME computer. Enter username admin and password from FLOODGUARD_SETUP_TOKEN in .env. Scan a new WhatsApp QR on your authorized phone only if an old secure auth backup is unavailable.
 6. To stop use Ctrl+C. The PC must stay awake and connected for message delivery. Back up your private data directory securely.
 
@@ -24,3 +24,7 @@ On a separately approved EC2 VM, install Node 20+, mount a persistent writable d
 Settings only reveal mode, port, loopback/network scope, and a basic storage-accessibility test. They never reveal tokens, network addresses, filesystem paths or Wi-Fi values. A writable directory does not prove durable persistence. Switch environments only by stopping the previous process, backing up and transferring auth files privately if legitimately available, then starting ONE new instance. Never run both bots linked to the same WhatsApp account simultaneously.
 
 The Arduino and ESP8266 were already flashed and worked correctly according to the owner; no firmware changes or physical gate commands are involved. Phase A/Phase B Firebase rules and all deployments remain separate approval gates.
+
+## Offline readiness check
+
+Run `npm run doctor` after setting up the private `.env` and the durable data directory, before launching the bot. The check does not access WhatsApp, Firebase or physical FloodGuard devices and never prints credentials or absolute paths. It checks the selected PC/EC2 mode, Node version, private setup token format, localhost-only admin binding, secure RTDB URL syntax, storage accessibility, and stale-data threshold. Missing old WhatsApp session files trigger a **warning**, not a failure; pairing may still be necessary. A passed preflight does **not** certify online service, HTTPS proxy or durable volume behavior.
