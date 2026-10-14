@@ -7,7 +7,7 @@ const fs=require('node:fs');
 const {PUBLIC_PATHS,applyEvent}=require('../src/firebase');
 const {fieldTimeMs}=require('../src/floodguard');
 const fixture=JSON.parse(fs.readFileSync('tests/fixtures/stage18-shared-child-stream.json','utf8'));
-const apply=(root,event)=>applyEvent(root,event.branch,event.kind,event.packet);
+const apply=(root,event)=>applyEvent(root,event.branch,event.kind,JSON.parse(JSON.stringify(event.packet)));
 const snapshot=caseInfo=>{
   const state={};
   for(const step of [...fixture.setup,...caseInfo.operations])apply(state,step);
