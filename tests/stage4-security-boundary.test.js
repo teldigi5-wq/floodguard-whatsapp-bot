@@ -2,6 +2,7 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {once}=require('node:events');
+const http=require('node:http');
 const fs=require('node:fs');
 const path=require('node:path');
 const {createDemoApp}=require('../src/demoServer');
@@ -24,9 +25,22 @@ test('localhost request authority is validated against actual port and blocks DN
     const res=await fetch(url+route,{headers:auth});
     assert.equal(res.status,200,route);
     for(const forged of ['demo.attacker.example:4242','localhost:4545','127.0.0.1:9999','127.0.0.1.example:4242']){
-      const bad=await fetch(url+route,{headers:{...auth,Host:forged}});
+      // Undici fetch does not reliably forward an overridden Host header.
+      // Use a raw, loopback-only HTTP client to actually send the forged wire header.
+      const target=new URL(url+route);
+      const bad=await new Promise((resolve,reject)=>{
+        const request=http.request({
+          hostname:'127.0.0.1',port:Number(target.port),path:target.pathname+target.search,
+          method:'GET',headers:{...auth,Host:forged}
+        },response=>{
+          response.resume();
+          response.on('end',()=>resolve({status:response.statusCode,headers:response.headers}));
+        });
+        request.once('error',reject);
+        request.end();
+      });
       assert.equal(bad.status,421,route+' host='+forged);
-      assert.equal(bad.headers.get('access-control-allow-origin'),null);
+      assert.equal(bad.headers['access-control-allow-origin'],undefined);
     }
   }
 }));
