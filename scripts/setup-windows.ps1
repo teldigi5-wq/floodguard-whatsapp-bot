@@ -37,5 +37,5 @@ try {
   try { $writer.WriteLine(($lines -join [Environment]::NewLine)) } finally { $writer.Dispose() }
 } finally { $stream.Dispose() }
 Write-Host 'Created local data directory and private .env; token is in .env only.'
-Write-Host 'Next: npm ci ; npm test ; npm run start:pc'
-Write-Host 'Open http://127.0.0.1:8080 (username admin, password from .env).'
+Write-Host 'Next (offline only): npm ci ; npm test ; npm run doctor ; npm run drill:offline ; npm run start:demo'
+Write-Host 'Offline demo: http://127.0.0.1:8085 (username admin; private password from .env). Do not start a live bot or pair WhatsApp.'

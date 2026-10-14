@@ -253,3 +253,10 @@ The approved development preview runs on a **Windows PC localhost only**, using 
 The optional GitHub Actions **FloodGuard offline browser QA** workflow opens the authenticated localhost-only demo in headless Chromium, checks narrow phone/tablet/desktop layouts (including a 320px phone), exercises scenarios and synthetic chat, checks keyboard access and reduced-motion, runs automated WCAG A/AA checks with axe-core, and fails if a browser request is attempted outside the local demo routes. The browser job never provisions production credentials or reaches Firebase/WhatsApp; its Basic Auth token is generated in the job and is not logged. CI-only Playwright dependencies are installed transiently for that workflow, so the production bot's dependency lockfile is unchanged.
 
 The demo's Content Security Policy allows only hashed static inline CSS and JavaScript and same-origin fixture requests. Its preview button recovers if a scenario is changed while a previous command is pending. Automated browser checks are a QA safety net, not a substitute for final manual accessibility/device assessment or independent packet-level network isolation certification.
+
+
+## Stage 3 — Windows PC offline operations acceptance (draft, not deployed)
+
+**Current safe workflow:** `npm ci` → `npm test` → `npm run doctor` → `npm run drill:offline` → `npm run start:demo`. This rehearses only fictional sensor state and a disposable synthetic backup. It **does not** restore any WhatsApp auth files, validate real storage encryption, activate a real bot, contact Firebase, pair WhatsApp or touch the flashed Arduino/ESP8266. The Windows CI also starts and stops only its **own localhost demo child process**, twice, to check restart readiness.
+
+[Full Stage 3 acceptance, incident response and separate live-approval gates](docs/STAGE3_OFFLINE_OPERATIONS.md). In particular, passing Stage 3 is **not** authorization to run `start:pc` or `start:ec2`; those are still future separately approved live processes.

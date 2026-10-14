@@ -49,3 +49,11 @@ jobs:
             try { Invoke-WebRequest -Uri 'http://127.0.0.1:8085/qr' -Headers $headers -ErrorAction Stop; throw 'Offline demo unexpectedly exposes a QR' } catch { if ($_.Exception.Response.StatusCode.value__ -ne 404) { throw } }
           } finally { if (!$proc.HasExited) { Stop-Process -Id $proc.Id -Force } }
           Write-Host 'Windows PC setup smoke tests passed (no secrets printed).'
+      - name: Rehearse synthetic backup, tamper rejection and cleanup
+        shell: pwsh
+        run: |
+          npm run drill:offline
+          if ($LASTEXITCODE -ne 0) { throw 'Offline synthetic backup/restore drill failed' }
+      - name: Rehearse isolated demo process restart twice
+        shell: pwsh
+        run: ./scripts/test-demo-recovery.ps1
