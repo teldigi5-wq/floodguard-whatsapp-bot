@@ -1,0 +1,40 @@
+name: FloodGuard Windows PC setup validation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pc:
+    name: Windows startup configuration and offline tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies and run offline tests
+        run: |
+          npm ci
+          npm test
+      - name: Validate PowerShell PC setup and idempotence
+        shell: pwsh
+        run: |
+          ./scripts/setup-windows.ps1
+          if (!(Test-Path -LiteralPath '.env')) { throw 'Windows setup did not create .env' }
+          if (!(Test-Path -LiteralPath 'data')) { throw 'Windows setup did not create data directory' }
+          $settings = Get-Content '.env' -Raw
+          if ($settings -notmatch '(?m)^FLOODGUARD_HOST_MODE=pc\r?$') { throw 'Wrong Windows profile' }
+          if ($settings -notmatch '(?m)^HOST=127\.0\.0\.1\r?$') { throw 'Windows admin listener not loopback' }
+          if ($settings -notmatch '(?m)^FLOODGUARD_SETUP_TOKEN=[A-F0-9]{64}\r?$') { throw 'Windows random setup token missing or weak' }
+          $before = (Get-FileHash '.env' -Algorithm SHA256).Hash
+          ./scripts/setup-windows.ps1
+          $after = (Get-FileHash '.env' -Algorithm SHA256).Hash
+          if ($before -ne $after) { throw 'Windows setup unexpectedly overwrote existing settings' }
+          Write-Host 'Windows PC setup smoke tests passed (no secrets printed).'
