@@ -1,4 +1,4 @@
-function renderPage() {
+function renderPage({demoMode = false} = {}) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -20,6 +20,40 @@ function renderPage() {
     .fresh{margin-top:16px;display:flex;gap:7px;align-items:center;color:#9ec6d7;font-size:11px}.fresh i{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(86,230,162,.6)}.title{font-size:20px;font-weight:800;margin:19px 0 7px}.hint{margin:0;color:var(--muted);font-size:13px;line-height:1.62;max-width:425px}.chips{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:16px}.chip{padding:7px 10px;border-radius:11px;background:rgba(255,255,255,.045);font-size:10px;color:#b8d0dc}
     .spinner{width:76px;height:76px;border-radius:50%;border:3px solid rgba(87,221,255,.13);border-top-color:var(--cyan);box-shadow:0 0 38px rgba(87,221,255,.11);animation:spin .9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.check{width:106px;height:106px;border-radius:50%;display:grid;place-items:center;font-size:52px;color:#dffff0;background:radial-gradient(circle,rgba(86,230,162,.3),rgba(86,230,162,.07));border:1px solid rgba(86,230,162,.36);box-shadow:0 0 70px rgba(86,230,162,.15)}.successTitle{font-size:27px;margin:22px 0 8px}.device{margin-top:18px;padding:11px 14px;border-radius:14px;border:1px solid rgba(86,230,162,.14);background:rgba(86,230,162,.055);color:#c0f5dc;font:11px ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all}footer{text-align:center;padding:0 24px 24px;color:#607f8f;font-size:10px;position:relative;z-index:2}
     @media(max-width:540px){body{overflow:auto}.shell{padding:12px}.card{min-height:610px;border-radius:28px}header{padding:28px 18px 13px}.body{padding:9px 13px 20px}.stage{min-height:440px;border-radius:23px}.qrShell{width:min(310px,82vw)}}
+
+    /* Hosting settings: quiet, keyboard-accessible extension of the existing premium UI. */
+    body{overflow:auto}
+    .hostingSettings{margin:0 24px 20px;border:1px solid rgba(87,221,255,.16);border-radius:20px;background:rgba(8,28,41,.7);position:relative;z-index:2}
+    .hostingSettings>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px 18px;color:#d9f3ff;font-size:13px;font-weight:700}
+    .hostingSettings>summary::-webkit-details-marker{display:none}
+    .hostingSettings>summary:focus-visible,.hostingSelect:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+    .hostingRight{display:flex;align-items:center;gap:9px;color:#85b7c9;font-weight:500;font-size:11px}
+    .hostingRight:after{content:'⌄';color:var(--cyan);font-size:16px}
+    .hostingSettings[open] .hostingRight:after{transform:rotate(180deg)}
+    .hostingBody{border-top:1px solid var(--line);padding:18px;display:grid;gap:13px;text-align:left}
+    .hostingBody .hint{max-width:none}
+    .hostingLabel{color:#c9eaf9;font-weight:650;font-size:12px}
+    .hostingSelect{border:1px solid rgba(100,206,255,.27);background:#0b1b28;color:#f4fbff;padding:12px 13px;border-radius:12px;font:inherit;font-size:13px;width:100%}
+    .hostingMetrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+    .hostingMetric{border:1px solid rgba(255,255,255,.075);border-radius:13px;background:rgba(255,255,255,.027);padding:11px;min-width:0}
+    .hostingMetric small{display:block;color:#89acbb;font-size:10px;margin-bottom:5px}
+    .hostingMetric strong{display:block;color:#dff4ff;font-size:12px;overflow-wrap:anywhere}
+    .hostingGuide{white-space:pre-line;font-size:12px;line-height:1.75;color:#b6d7e6;padding:12px;background:rgba(10,25,40,.8);border-radius:13px;border:1px solid var(--line)}
+    .hostingNote{color:#ffc861;font-size:11px;line-height:1.55}
+    @media(max-width:540px){.hostingSettings{margin:0 13px 16px}.hostingMetrics{grid-template-columns:1fr}}
+
+    .demoRisk{padding:9px 14px;border-radius:999px;border:1px solid rgba(255,200,97,.4);color:#ffc861;background:rgba(255,200,97,.08);font-size:11px;font-weight:800;letter-spacing:.05em}
+    .demoStack{display:grid;gap:13px;width:100%;max-width:415px;text-align:left}
+    .demoFields{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+    .demoField{padding:13px;border:1px solid var(--line);border-radius:15px;background:rgba(255,255,255,.04)}
+    .demoField span{display:block;color:#91b6c9;font-size:11px;margin-bottom:6px}
+    .demoField strong{font-size:16px;color:#d7f4ff}
+    .demoInfo{color:#91b6c9;font-size:11px;line-height:1.6;text-align:center}
+    @media(max-width:540px){.demoFields{grid-template-columns:1fr}}
+    .demoCommandPanel{border:1px solid var(--line);border-radius:16px;padding:13px;background:rgba(10,25,40,.62);display:grid;gap:10px}
+    .demoCommandPanel label{font-size:12px;color:#c9eaf9;font-weight:700}
+    .demoReply{padding:12px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;color:#d1e8f5;background:rgba(0,0,0,.26);min-height:110px;max-height:230px;overflow:auto}
+    .demoGuard{font-size:10px;font-weight:650;color:#ffc861;line-height:1.6}
   </style>
 </head>
 <body>
@@ -30,10 +64,66 @@ function renderPage() {
 <section id="qrView" class="view hidden"><div id="qrShell" class="qrShell"><img id="qrImage" alt="WhatsApp QR code"><div class="scan"></div></div><div class="fresh"><i></i><span>Current WhatsApp QR</span></div><div class="title">Scan once to link FloodGuard</div><p class="hint">After the first successful scan, FloodGuard keeps the saved session. Normal network drops and EC2 restarts reconnect without asking for another QR.</p><div class="chips"><span class="chip">WhatsApp</span><span class="chip">Linked Devices</span><span class="chip">Link a Device</span><span class="chip">Scan QR</span></div></section>
 <section id="waitingView" class="view"><div class="spinner"></div><div id="waitingTitle" class="title">Restoring WhatsApp session…</div><p id="waitingText" class="hint">No QR is needed unless WhatsApp has actually logged this linked device out.</p></section>
 <section id="connectedView" class="view hidden"><div class="check">✓</div><h2 class="successTitle">WhatsApp Connected Successfully</h2><p class="hint">The persistent FloodGuard WhatsApp session is authenticated and active.</p><div id="device" class="device"></div></section>
-</div></div><footer>Stable UI · persistent session · QR only when re-linking is required</footer></section></main>
+<section id="demoView" class="view hidden" aria-label="Offline simulation preview">
+  <div class="demoStack">
+    <div style="text-align:center"><span class="demoRisk">SIMULATION ONLY · NO LIVE DATA</span></div>
+    <h2 class="title" style="text-align:center;margin:4px 0">Offline FloodGuard Preview</h2>
+    <p class="hint" style="text-align:center">WhatsApp pairing, Firebase connections and Arduino/ESP8266 control are disabled in this preview. Nothing here sends alerts or operates the gate.</p>
+    <label for="demoScenario" class="hostingLabel">Simulated sensor scenario</label>
+    <select class="hostingSelect" id="demoScenario">
+      <option value="offline" selected>Offline — no sensor readings</option>
+      <option value="safe">SAFE (synthetic)</option>
+      <option value="warning">WARNING (synthetic)</option>
+      <option value="danger">DANGER (synthetic)</option>
+    </select>
+    <div class="demoFields">
+      <div class="demoField"><span>Simulation state</span><strong id="demoLevel">OFFLINE</strong></div>
+      <div class="demoField"><span>Example water level</span><strong id="demoWater">NOT AVAILABLE</strong></div>
+      <div class="demoField"><span>Example gate indication</span><strong id="demoGate">NOT AVAILABLE</strong></div>
+      <div class="demoField"><span>Alerts sent</span><strong>NONE (disabled)</strong></div>
+    </div>
+    <p class="demoInfo" aria-live="polite" id="demoExplanation">No current measurements. The already-flashed hardware does not need to be online to preview this interface.</p>
+    <div class="demoCommandPanel">
+      <label for="demoCommand">Preview a WhatsApp command — no account connection</label>
+      <select id="demoCommand" class="hostingSelect" aria-describedby="demoCommandWarning">
+        <option value="stats" selected>stats — system summary</option>
+        <option value="menu">menu — command list</option>
+        <option value="water">water — water level</option>
+        <option value="risk">risk — flood risk</option>
+        <option value="gate">gate — gate status</option>
+        <option value="rain">rain — rain gauge</option>
+        <option value="devices">devices — hardware status</option>
+        <option value="network">network — connectivity</option>
+        <option value="emergency">emergency — alarm example</option>
+      </select>
+      <p class="demoGuard" id="demoCommandWarning">SYNTHETIC RESPONSE ONLY · Nothing is sent to WhatsApp. Subscription commands are disabled.</p>
+      <div id="demoReply" class="demoReply" role="status" aria-live="polite">Loading synthetic command example…</div>
+    </div>
+  </div>
+</section>
+</div></div>
+<details id="hostingSettings" class="hostingSettings">
+  <summary><span>Hosting settings</span><span class="hostingRight"><span id="hostingActive">Checking active profile…</span></span></summary>
+  <div class="hostingBody">
+    <p class="hint">The same FloodGuard bot can run on your Windows PC or an approved EC2 instance. Current settings are read-only; selecting a guide will not start, stop, or move the bot.</p>
+    <div class="hostingMetrics">
+      <div class="hostingMetric"><small>Listener access</small><strong id="hostingBinding">Checking…</strong></div>
+      <div class="hostingMetric"><small>Data directory access</small><strong id="hostingStorage">Checking…</strong></div>
+    </div>
+    <label class="hostingLabel" for="hostingProfile">Show instructions for</label>
+    <select id="hostingProfile" class="hostingSelect">
+      <option value="pc">My Windows PC</option>
+      <option value="ec2">AWS EC2 (when available)</option>
+    </select>
+    <div id="hostingGuide" class="hostingGuide" aria-live="polite">Loading setup guide…</div>
+    <p class="hostingNote">Preview only. To change the actual host, configure its private .env and restart a single bot process. Keep WhatsApp credentials on persistent storage and never run duplicate sessions.</p>
+  </div>
+</details>
+<footer>Stable UI · persistent session · QR only when re-linking is required</footer></section></main>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
+  const launchedAsDemo = ${demoMode ? 'true' : 'false'};
   let activeView = null;
   let lastSignature = '';
   let currentQrVersion = null;
@@ -45,14 +135,51 @@ function renderPage() {
     $("qrView").classList.toggle("hidden", name !== "qr");
     $("waitingView").classList.toggle("hidden", name !== "waiting");
     $("connectedView").classList.toggle("hidden", name !== "connected");
+    $("demoView").classList.toggle("hidden", name !== "demo");
   }
+
+  const scenarios = {
+    offline:{level:'OFFLINE',water:'NOT AVAILABLE',gate:'NOT AVAILABLE',note:'No live data: historical Firebase readings must never be presented as current.'},
+    safe:{level:'SAFE · SYNTHETIC',water:'4.0 cm (simulated)',gate:'CLOSED (simulated)',note:'A synthetic SAFE visualization only; no real sensor data has been read.'},
+    warning:{level:'WARNING · SYNTHETIC',water:'9.0 cm (simulated)',gate:'CLOSED (simulated)',note:'This is a synthetic warning example; WhatsApp alert delivery is disabled.'},
+    danger:{level:'DANGER · SYNTHETIC',water:'12.0 cm (simulated)',gate:'COUNTDOWN (simulated)',note:'Simulated danger visualization only. No gate countdown, servo movement or real alert occurs.'}
+  };
+  function renderDemoScenario() {
+    const scenario = scenarios[$('demoScenario').value] || scenarios.offline;
+    $('demoLevel').textContent=scenario.level;
+    $('demoWater').textContent=scenario.water;
+    $('demoGate').textContent=scenario.gate;
+    $('demoExplanation').textContent=scenario.note;
+    if (launchedAsDemo) loadDemoReply();
+  }
+  let demoRequestId=0;
+  async function loadDemoReply() {
+    if (!launchedAsDemo) return;
+    const requestId=++demoRequestId;
+    const command=$('demoCommand').value;
+    const scenario=$('demoScenario').value;
+    try {
+      const url='/demo/preview?command='+encodeURIComponent(command)+'&scenario='+encodeURIComponent(scenario);
+      const response=await fetch(url,{cache:'no-store'});
+      if (!response.ok) throw new Error('Demo example unavailable');
+      const result=await response.json();
+      if(requestId!==demoRequestId)return;
+      if(result.demoMode!==true || result.delivered!==false || typeof result.reply!=='string')throw new Error('Invalid demo response');
+      $('demoReply').textContent=result.reply;
+    } catch {
+      if(requestId===demoRequestId)$('demoReply').textContent='SIMULATION ONLY · Example temporarily unavailable. No message was sent.';
+    }
+  }
+  $('demoCommand').addEventListener('change',loadDemoReply);
+  $('demoScenario').addEventListener('change',renderDemoScenario);
+  renderDemoScenario();
 
   function updateStatus(status) {
     const dot = $("dot");
     const text = $("statusText");
-    const className = status === 'CONNECTED' ? 'dot ok' : status === 'WAITING_FOR_QR_SCAN' ? 'dot wait' : status === 'LOGGED_OUT' ? 'dot bad' : 'dot wait';
+    const className = status === 'CONNECTED' ? 'dot ok' : status === 'DEMO_MODE' ? 'dot wait' : status === 'WAITING_FOR_QR_SCAN' ? 'dot wait' : status === 'LOGGED_OUT' ? 'dot bad' : 'dot wait';
     if (dot.className !== className) dot.className = className;
-    const label = status === 'CONNECTED' ? 'WhatsApp connected' : status === 'WAITING_FOR_QR_SCAN' ? 'QR scan required' : status === 'LOGGED_OUT' ? 'Session logged out · preparing QR' : status === 'DISCONNECTED' ? 'Reconnecting saved session…' : 'Restoring saved session…';
+    const label = status === 'CONNECTED' ? 'WhatsApp connected' : status === 'DEMO_MODE' ? 'Offline demo · pairing disabled' : status === 'WAITING_FOR_QR_SCAN' ? 'QR scan required' : status === 'LOGGED_OUT' ? 'Session logged out · preparing QR' : status === 'DISCONNECTED' ? 'Reconnecting saved session…' : 'Restoring saved session…';
     if (text.textContent !== label) text.textContent = label;
   }
 
@@ -71,10 +198,14 @@ function renderPage() {
   }
 
   function apply(data) {
-    const signature = [data.whatsapp, data.firebase, data.connectedNumber || '', data.hasQr ? '1' : '0', data.qrVersion || '', data.lastError || ''].join('|');
+    const signature = [data.whatsapp, data.firebase, data.connectedNumber || '', data.hasQr ? '1' : '0', data.qrVersion || '', data.lastError || '', data.demoMode ? 'demo' : 'live'].join('|');
     if (signature === lastSignature) return; // absolutely no visual work when state did not change
     lastSignature = signature;
     updateStatus(data.whatsapp || 'STARTING');
+    if (data.demoMode === true && data.whatsapp === 'DEMO_MODE') {
+      show('demo');
+      return;
+    }
 
     if (data.whatsapp === 'CONNECTED') {
       show('connected');
@@ -123,8 +254,55 @@ function renderPage() {
     }
   }
 
+
+  const hostingGuides = {
+    pc: [
+      '1. Install Node.js 20+ and clone the reviewed FloodGuard bot on your own PC.',
+      '2. Run scripts/setup-windows.ps1 once; keep the generated .env and data directory private.',
+      '3. Run npm ci, npm test, then npm run start:pc.',
+      '4. Open http://127.0.0.1:8080 locally and sign in as admin using the private setup token.',
+      '5. Scan the WhatsApp QR only if previous private session data is not available.',
+      'The PC must stay powered on and connected for the bot to reply.'
+    ],
+    ec2: [
+      '1. Obtain access to an approved EC2 VM; the previous unavailable AWS host is not recovered.',
+      '2. Configure private .env with FLOODGUARD_HOST_MODE=ec2 and a persistent writable DATA_PATH.',
+      '3. Keep HOST=127.0.0.1. Secure QR setup using an HTTPS proxy or private SSH tunnel.',
+      '4. Install Node.js 20+, run npm ci and npm test, then npm run start:ec2 for a supervised test.',
+      '5. Run a single reviewed PM2 process only after successful manual verification.',
+      'Never use the old inaccessible EC2 workflow to deploy to a new host.'
+    ]
+  };
+
+  function renderHostingGuide() {
+    const chosen = $('hostingProfile').value;
+    $('hostingGuide').textContent = (hostingGuides[chosen] || hostingGuides.pc).join('\\n');
+  }
+
+  async function loadHostingSettings() {
+    try {
+      const response = await fetch('/hosting', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Hosting settings are unavailable');
+      const config = await response.json();
+      if (config.profile !== 'pc' && config.profile !== 'ec2') throw new Error('Unknown hosting profile');
+      $('hostingActive').textContent = config.profile === 'pc' ? 'Active: Windows / PC' : 'Active: EC2';
+      $('hostingBinding').textContent = config.bindScope === 'loopback' ? 'Private loopback' : 'Network binding — protect with TLS';
+      $('hostingStorage').textContent = config.storageAccessible ? 'Directory accessible (durability unverified)' : 'Directory not accessible';
+      $('hostingProfile').value = config.profile;
+    } catch {
+      $('hostingActive').textContent = 'Runtime unavailable';
+      $('hostingBinding').textContent = 'Unable to confirm';
+      $('hostingStorage').textContent = 'Unable to confirm';
+    }
+    renderHostingGuide();
+  }
+
+  $('hostingProfile').addEventListener('change', renderHostingGuide);
+  loadHostingSettings();
+
+  if (launchedAsDemo) { show('demo'); updateStatus('DEMO_MODE'); }
   poll();
-  setInterval(poll, 2000); // silent background check; UI changes only on actual state changes
+  if (!launchedAsDemo) setInterval(poll, 2000); // demo never needs continual server polling
 })();
 </script>
 </body></html>`;

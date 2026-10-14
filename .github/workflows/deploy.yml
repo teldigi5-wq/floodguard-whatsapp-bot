@@ -1,36 +1,61 @@
-name: Deploy FloodGuard to EC2
+name: Deploy FloodGuard to EC2 (manual approval)
 
+# Never redeploy the production WhatsApp bot simply because main changes.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: 'Exact 40-character commit SHA reviewed and approved for EC2 deployment'
+        required: true
+        type: string
+      approve_restart:
+        description: 'I have reviewed QA, backed up EC2, and approve restart'
+        required: true
+        type: choice
+        options:
+          - 'NO'
+          - 'DEPLOY'
 
 permissions:
   contents: read
 
 jobs:
   deploy:
+    name: Deploy reviewed commit to EC2
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: floodguard-ec2-production
     env:
       EC2_HOST: ${{ secrets.EC2_HOST }}
       EC2_KEY: ${{ secrets.EC2_KEY }}
-
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      APPROVAL: ${{ inputs.approve_restart }}
     steps:
-      - name: Check EC2 deployment configuration
-        id: config
+      - name: Validate explicit approval and immutable revision
         shell: bash
         run: |
-          if [[ -n "$EC2_HOST" && -n "$EC2_KEY" ]]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-            echo "EC2 deployment credentials are configured."
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::EC2 deployment skipped because EC2_HOST and/or EC2_KEY are not configured in repository Actions secrets."
+          set -euo pipefail
+          if [[ "$APPROVAL" != "DEPLOY" ]]; then
+            echo "::error::Production restart requires explicit DEPLOY approval"
+            exit 1
           fi
-
-      - name: Deploy to EC2
-        if: steps.config.outputs.configured == 'true'
+          if [[ ! "$EXPECTED_SHA" =~ ^[a-fA-F0-9]{40}$ ]]; then
+            echo "::error::Expected commit must be an exact 40-character SHA"
+            exit 1
+          fi
+          if [[ -z "$EC2_HOST" || -z "$EC2_KEY" ]]; then
+            echo "::error::EC2 deployment secrets are not configured"
+            exit 1
+          fi
+      - name: Checkout reviewed revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+      - name: Deploy exact revision after checking remote head
         uses: appleboy/ssh-action@v1.2.2
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
         with:
           host: ${{ env.EC2_HOST }}
           username: ec2-user
@@ -38,11 +63,17 @@ jobs:
           port: 22
           timeout: 30s
           command_timeout: 10m
+          envs: EXPECTED_SHA
           script: |
-            set -e
+            set -eu
             cd ~/floodguard-whatsapp-bot
-            git fetch origin
-            git reset --hard origin/main
-            npm ci --omit=dev || npm install --omit=dev
+            git fetch origin main
+            actual="$(git rev-parse origin/main)"
+            if [ "$actual" != "$EXPECTED_SHA" ]; then
+              echo "ERROR: origin/main is not the approved commit, refusing deployment"
+              exit 1
+            fi
+            git reset --hard "$EXPECTED_SHA"
+            npm ci --omit=dev
             pm2 restart floodguard-whatsapp-bot --update-env || pm2 start ecosystem.config.js
             pm2 save

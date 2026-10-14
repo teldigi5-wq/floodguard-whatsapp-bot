@@ -1,3 +1,4 @@
+// Legacy optional EC2 PM2 configuration; not a valid deployment target while AWS is inaccessible.
 module.exports = {
   apps: [
     {
@@ -12,6 +13,8 @@ module.exports = {
       max_memory_restart: "450M",
       env: {
         NODE_ENV: "production",
+        FLOODGUARD_HOST_MODE: "ec2",
+        HOST: "127.0.0.1",
         PORT: 8080,
         DATA_PATH: "/data"
       },
