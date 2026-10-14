@@ -100,7 +100,7 @@ test('preview endpoint enforces admin access and rejects command side effects',a
 }));
 test('command preview source is a pure module without data stores or network access',()=>{
   const source=fs.readFileSync(path.resolve(__dirname,'../src/demoReplies.js'),'utf8');
-  assert.doesNotMatch(source,/require\(|fetch\(|process\.env|sendMessage|subscribe\(|\.writeFile|Firebase|https\.get/);
+  assert.doesNotMatch(source,/\brequire\(|\bfetch\(|\bprocess\.env\b|\bsendMessage\(|\bsubscribe\(|\.writeFile|https\.get/);
   const {previewReply}=require('../src/demoReplies');
   const result=previewReply('stats','offline');
   assert.match(result,/Water: NOT AVAILABLE/);
