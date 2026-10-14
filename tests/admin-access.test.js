@@ -19,6 +19,7 @@ async function withServer(token, fn) {
     connectedNumber:'synthetic-number', lastError:'synthetic-internal-error'
   }));
   app.get('/qr', guard, (_req,res)=>res.send('SYNTHETIC-QR-NOT-A-REAL-CODE'));
+  app.get('/hosting', guard, (_req,res)=>res.json({profile:'pc',bindScope:'loopback',storageAccessible:true}));
   app.get('/health', (_req,res)=>res.json({status:'ok',service:'FloodGuard WhatsApp Bot'}));
   const server=app.listen(0,'127.0.0.1');
   try {
@@ -37,7 +38,7 @@ test('token policy rejects missing, short and unsafe configured values',()=>{
 });
 test('admin page, QR and status fail closed with unconfigured secret',async()=>{
   await withServer('',async(base)=>{
-    for(const path of ['/','/qr','/status']){
+    for(const path of ['/','/qr','/status','/hosting']){
       const response=await fetch(base+path,{headers:{Authorization:auth()}});
       assert.equal(response.status,503,path);
       assert.match(response.headers.get('cache-control'),/no-store/);
@@ -51,7 +52,7 @@ test('admin page, QR and status fail closed with unconfigured secret',async()=>{
 });
 test('no or wrong credentials cannot retrieve setup, status or QR',async()=>{
   await withServer(secret,async(base)=>{
-    for(const path of ['/','/qr','/status']){
+    for(const path of ['/','/qr','/status','/hosting']){
       for(const authorization of [undefined,'Bearer '+secret,auth('incorrect'),auth(secret,'other')]){
         const response=await fetch(base+path,{
           headers: authorization ? {Authorization:authorization} : {}
@@ -67,7 +68,7 @@ test('no or wrong credentials cannot retrieve setup, status or QR',async()=>{
 });
 test('correct authorized browser can access existing QR and status routes',async()=>{
   await withServer(secret,async(base)=>{
-    for(const path of ['/','/qr','/status']){
+    for(const path of ['/','/qr','/status','/hosting']){
       const response=await fetch(base+path,{headers:{Authorization:auth()}});
       assert.equal(response.status,200,path);
       assert.match(response.headers.get('cache-control'),/no-store/);

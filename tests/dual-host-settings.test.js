@@ -39,3 +39,17 @@ test('portable PM2 remains single-instance and inherits configured mode',()=>{
   assert.match(code,/require\('\.\.\/bot'\)/);
   assert.ok(fs.existsSync(path.join(__dirname,'../scripts/setup-windows.ps1')));
 });
+
+test('premium setup UI exposes functioning hosting settings and read-only preview',()=>{
+  const { renderPage } = require('../src/webUi');
+  const page=renderPage();
+  for(const element of ['hostingSettings','hostingActive','hostingBinding','hostingStorage','hostingProfile','hostingGuide']){
+    assert.ok(page.includes('id="'+element+'"'),element+' missing');
+  }
+  assert.match(page,/fetch\('\/hosting', \{ cache: 'no-store' \}\)/);
+  assert.match(page,/hostingProfile'\)\.addEventListener\('change'/);
+  assert.match(page,/Active: Windows \/ PC/);
+  assert.match(page,/Active: EC2/);
+  assert.match(page,/Preview only/);
+  assert.doesNotMatch(page,/fetch\('\/hosting', \{ method: 'POST'/);
+});

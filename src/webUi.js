@@ -20,6 +20,27 @@ function renderPage() {
     .fresh{margin-top:16px;display:flex;gap:7px;align-items:center;color:#9ec6d7;font-size:11px}.fresh i{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 12px rgba(86,230,162,.6)}.title{font-size:20px;font-weight:800;margin:19px 0 7px}.hint{margin:0;color:var(--muted);font-size:13px;line-height:1.62;max-width:425px}.chips{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:16px}.chip{padding:7px 10px;border-radius:11px;background:rgba(255,255,255,.045);font-size:10px;color:#b8d0dc}
     .spinner{width:76px;height:76px;border-radius:50%;border:3px solid rgba(87,221,255,.13);border-top-color:var(--cyan);box-shadow:0 0 38px rgba(87,221,255,.11);animation:spin .9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.check{width:106px;height:106px;border-radius:50%;display:grid;place-items:center;font-size:52px;color:#dffff0;background:radial-gradient(circle,rgba(86,230,162,.3),rgba(86,230,162,.07));border:1px solid rgba(86,230,162,.36);box-shadow:0 0 70px rgba(86,230,162,.15)}.successTitle{font-size:27px;margin:22px 0 8px}.device{margin-top:18px;padding:11px 14px;border-radius:14px;border:1px solid rgba(86,230,162,.14);background:rgba(86,230,162,.055);color:#c0f5dc;font:11px ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all}footer{text-align:center;padding:0 24px 24px;color:#607f8f;font-size:10px;position:relative;z-index:2}
     @media(max-width:540px){body{overflow:auto}.shell{padding:12px}.card{min-height:610px;border-radius:28px}header{padding:28px 18px 13px}.body{padding:9px 13px 20px}.stage{min-height:440px;border-radius:23px}.qrShell{width:min(310px,82vw)}}
+
+    /* Hosting settings: quiet, keyboard-accessible extension of the existing premium UI. */
+    body{overflow:auto}
+    .hostingSettings{margin:0 24px 20px;border:1px solid rgba(87,221,255,.16);border-radius:20px;background:rgba(8,28,41,.7);position:relative;z-index:2}
+    .hostingSettings>summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px 18px;color:#d9f3ff;font-size:13px;font-weight:700}
+    .hostingSettings>summary::-webkit-details-marker{display:none}
+    .hostingSettings>summary:focus-visible,.hostingSelect:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+    .hostingRight{display:flex;align-items:center;gap:9px;color:#85b7c9;font-weight:500;font-size:11px}
+    .hostingRight:after{content:'⌄';color:var(--cyan);font-size:16px}
+    .hostingSettings[open] .hostingRight:after{transform:rotate(180deg)}
+    .hostingBody{border-top:1px solid var(--line);padding:18px;display:grid;gap:13px;text-align:left}
+    .hostingBody .hint{max-width:none}
+    .hostingLabel{color:#c9eaf9;font-weight:650;font-size:12px}
+    .hostingSelect{border:1px solid rgba(100,206,255,.27);background:#0b1b28;color:#f4fbff;padding:12px 13px;border-radius:12px;font:inherit;font-size:13px;width:100%}
+    .hostingMetrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+    .hostingMetric{border:1px solid rgba(255,255,255,.075);border-radius:13px;background:rgba(255,255,255,.027);padding:11px;min-width:0}
+    .hostingMetric small{display:block;color:#89acbb;font-size:10px;margin-bottom:5px}
+    .hostingMetric strong{display:block;color:#dff4ff;font-size:12px;overflow-wrap:anywhere}
+    .hostingGuide{white-space:pre-line;font-size:12px;line-height:1.75;color:#b6d7e6;padding:12px;background:rgba(10,25,40,.8);border-radius:13px;border:1px solid var(--line)}
+    .hostingNote{color:#ffc861;font-size:11px;line-height:1.55}
+    @media(max-width:540px){.hostingSettings{margin:0 13px 16px}.hostingMetrics{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -30,7 +51,25 @@ function renderPage() {
 <section id="qrView" class="view hidden"><div id="qrShell" class="qrShell"><img id="qrImage" alt="WhatsApp QR code"><div class="scan"></div></div><div class="fresh"><i></i><span>Current WhatsApp QR</span></div><div class="title">Scan once to link FloodGuard</div><p class="hint">After the first successful scan, FloodGuard keeps the saved session. Normal network drops and EC2 restarts reconnect without asking for another QR.</p><div class="chips"><span class="chip">WhatsApp</span><span class="chip">Linked Devices</span><span class="chip">Link a Device</span><span class="chip">Scan QR</span></div></section>
 <section id="waitingView" class="view"><div class="spinner"></div><div id="waitingTitle" class="title">Restoring WhatsApp session…</div><p id="waitingText" class="hint">No QR is needed unless WhatsApp has actually logged this linked device out.</p></section>
 <section id="connectedView" class="view hidden"><div class="check">✓</div><h2 class="successTitle">WhatsApp Connected Successfully</h2><p class="hint">The persistent FloodGuard WhatsApp session is authenticated and active.</p><div id="device" class="device"></div></section>
-</div></div><footer>Stable UI · persistent session · QR only when re-linking is required</footer></section></main>
+</div></div>
+<details id="hostingSettings" class="hostingSettings">
+  <summary><span>Hosting settings</span><span class="hostingRight"><span id="hostingActive">Checking active profile…</span></span></summary>
+  <div class="hostingBody">
+    <p class="hint">The same FloodGuard bot can run on your Windows PC or an approved EC2 instance. Current settings are read-only; selecting a guide will not start, stop, or move the bot.</p>
+    <div class="hostingMetrics">
+      <div class="hostingMetric"><small>Listener access</small><strong id="hostingBinding">Checking…</strong></div>
+      <div class="hostingMetric"><small>Data directory access</small><strong id="hostingStorage">Checking…</strong></div>
+    </div>
+    <label class="hostingLabel" for="hostingProfile">Show instructions for</label>
+    <select id="hostingProfile" class="hostingSelect">
+      <option value="pc">My Windows PC</option>
+      <option value="ec2">AWS EC2 (when available)</option>
+    </select>
+    <div id="hostingGuide" class="hostingGuide" aria-live="polite">Loading setup guide…</div>
+    <p class="hostingNote">Preview only. To change the actual host, configure its private .env and restart a single bot process. Keep WhatsApp credentials on persistent storage and never run duplicate sessions.</p>
+  </div>
+</details>
+<footer>Stable UI · persistent session · QR only when re-linking is required</footer></section></main>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -122,6 +161,52 @@ function renderPage() {
       pollBusy = false;
     }
   }
+
+
+  const hostingGuides = {
+    pc: [
+      '1. Install Node.js 20+ and clone the reviewed FloodGuard bot on your own PC.',
+      '2. Run scripts/setup-windows.ps1 once; keep the generated .env and data directory private.',
+      '3. Run npm ci, npm test, then npm run start:pc.',
+      '4. Open http://127.0.0.1:8080 locally and sign in as admin using the private setup token.',
+      '5. Scan the WhatsApp QR only if previous private session data is not available.',
+      'The PC must stay powered on and connected for the bot to reply.'
+    ],
+    ec2: [
+      '1. Obtain access to an approved EC2 VM; the previous unavailable AWS host is not recovered.',
+      '2. Configure private .env with FLOODGUARD_HOST_MODE=ec2 and a persistent writable DATA_PATH.',
+      '3. Keep HOST=127.0.0.1. Secure QR setup using an HTTPS proxy or private SSH tunnel.',
+      '4. Install Node.js 20+, run npm ci and npm test, then npm run start:ec2 for a supervised test.',
+      '5. Run a single reviewed PM2 process only after successful manual verification.',
+      'Never use the old inaccessible EC2 workflow to deploy to a new host.'
+    ]
+  };
+
+  function renderHostingGuide() {
+    const chosen = $('hostingProfile').value;
+    $('hostingGuide').textContent = (hostingGuides[chosen] || hostingGuides.pc).join('\n');
+  }
+
+  async function loadHostingSettings() {
+    try {
+      const response = await fetch('/hosting', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Hosting settings are unavailable');
+      const config = await response.json();
+      if (config.profile !== 'pc' && config.profile !== 'ec2') throw new Error('Unknown hosting profile');
+      $('hostingActive').textContent = config.profile === 'pc' ? 'Active: Windows / PC' : 'Active: EC2';
+      $('hostingBinding').textContent = config.bindScope === 'loopback' ? 'Private loopback' : 'Network binding — protect with TLS';
+      $('hostingStorage').textContent = config.storageAccessible ? 'Directory accessible (durability unverified)' : 'Directory not accessible';
+      $('hostingProfile').value = config.profile;
+    } catch {
+      $('hostingActive').textContent = 'Runtime unavailable';
+      $('hostingBinding').textContent = 'Unable to confirm';
+      $('hostingStorage').textContent = 'Unable to confirm';
+    }
+    renderHostingGuide();
+  }
+
+  $('hostingProfile').addEventListener('change', renderHostingGuide);
+  loadHostingSettings();
 
   poll();
   setInterval(poll, 2000); // silent background check; UI changes only on actual state changes
