@@ -36,3 +36,7 @@ Run the Windows setup helper once, `npm run doctor`, then `npm run start:demo`. 
 ### Synthetic WhatsApp command preview
 
 In offline demo mode, choose a synthetic sensor state and one of the supported read-only command examples. The authenticated localhost-only `/demo/preview` endpoint produces **simulated, not-sent** text from a pure formatting module. It never reads Firebase, WhatsApp sessions, subscriber state, or physical gate controls. Subscription and any other mutating commands are rejected. The preview helps review UX wording; it does **not** prove live command parity or WhatsApp connectivity.
+
+## Stage 1 Offline Command Center
+
+The isolated demo server now hosts a standalone local Command Center rather than showing the real WhatsApp QR page. It includes mock sensor status cards, a simulated chat transcript, read-only quick command previews, example alert history and diagnostics. It uses **hard-coded synthetic fixtures** through authenticated `GET /demo/state` and `GET /demo/preview` only. Neither endpoint writes any data. All alert history is labeled example-only; no network/device status is inferred from the live environment. The layout supports mobile widths, focus-visible keyboard navigation, semantic headings, accessible labels and reduced-motion preferences. The real bot login page remains unchanged. This is a UX preview, not life-safety software validation.

@@ -50,7 +50,7 @@ The PC setup is the recommended recovery path while the old AWS account/host is 
 
 ### Offline preview — no WhatsApp pairing required
 
-If you **do not want to link WhatsApp yet**, you can inspect the premium FloodGuard administration UI and select simulated SAFE/WARNING/DANGER/Offline states using an isolated local server. This preview does not import or initialize WhatsApp/Baileys, connect to Firebase, use real telemetry, or perform hardware/gate actions. It contains **no QR pairing** and sends **no alerts**. The demo also includes a **read-only WhatsApp command preview** for `menu`, `stats`, `water`, `risk`, `gate`, `rain`, `devices`, `network` and `emergency`. All responses use synthetic examples. `subscribe` and `unsubscribe` are deliberately unavailable, and no user messages are sent.
+If you **do not want to link WhatsApp yet**, you can inspect the premium FloodGuard administration UI and select simulated SAFE/WARNING/DANGER/Offline states using an isolated local server. This preview does not import or initialize WhatsApp/Baileys, connect to Firebase, use real telemetry, or perform hardware/gate actions. It contains **no QR pairing** and sends **no alerts**. **Stage 1 Command Center:** The offline-only UI includes four synthetic sensor cards, responsive status panels, a local simulated WhatsApp chat, example alert history and read-only diagnostics. The demo also includes a **read-only WhatsApp command preview** for `menu`, `stats`, `water`, `risk`, `gate`, `rain`, `devices`, `network` and `emergency`. All responses use synthetic examples. `subscribe` and `unsubscribe` are deliberately unavailable, and no user messages are sent.
 
 After checking out the reviewed draft branch on your Windows PC:
 
@@ -62,7 +62,7 @@ npm run doctor
 npm run start:demo
 ```
 
-Open `http://127.0.0.1:8085` **on that same PC** and enter your local admin username `admin` and the private `FLOODGUARD_SETUP_TOKEN` value from `.env`. The page visibly displays **SIMULATION ONLY · NO LIVE DATA** and lets you switch synthetic scenarios. Stop the preview with `Ctrl+C`.
+Open `http://127.0.0.1:8085` **on that same PC** and enter your local admin username `admin` and the private `FLOODGUARD_SETUP_TOKEN` value from `.env`. The page visibly displays **SIMULATION ONLY · NO LIVE DATA** and lets you switch synthetic scenarios, inspect alert history and diagnostics, and preview read-only WhatsApp replies in a local chat. No example timeline event represents a real delivery. Stop the preview with `Ctrl+C`.
 
 **Do not run `npm run start:pc` or `npm run start:ec2` until you actually want to link WhatsApp.** Those are real bot processes. No change is required to the already-flashed Arduino/ESP8266.
 

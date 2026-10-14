@@ -2,8 +2,9 @@
 const express=require('express');
 const { createAdminGuard,validToken }=require('./adminAccess');
 const { describeHost }=require('./hosting');
-const { renderPage }=require('./webUi');
+const { renderCommandCenter }=require('./demoCommandCenter');
 const { previewReply }=require('./demoReplies');
+const { getDemoState }=require('./demoFixtures');
 
 // Synthetic admin/UI preview. DO NOT import bot.js, src/firebase.js,
 // Baileys, any session store, or any real networking client here.
@@ -15,7 +16,7 @@ function createDemoApp({token,port=8080,host='127.0.0.1'}={}) {
   const guard=createAdminGuard(token);
   app.get('/',guard,(_req,res)=>{
     res.set('Cache-Control','private, no-store');
-    res.type('html').send(renderPage({demoMode:true}));
+    res.type('html').send(renderCommandCenter());
   });
   app.get('/status',guard,(_req,res)=>{
     res.set('Cache-Control','private, no-store');
@@ -28,6 +29,13 @@ function createDemoApp({token,port=8080,host='127.0.0.1'}={}) {
   app.get('/hosting',guard,(_req,res)=>{
     res.set('Cache-Control','private, no-store');
     res.json({...describeHost({mode:'pc',host,port}),demoMode:true});
+  });
+  app.get('/demo/state',guard,(req,res)=>{
+    res.set('Cache-Control','private, no-store');
+    try {
+      if(typeof req.query.scenario!=='string')return res.status(400).json({error:'Choose a synthetic scenario.'});
+      res.json(getDemoState(req.query.scenario));
+    } catch { res.status(400).json({error:'Unsupported synthetic scenario.'}); }
   });
   app.get('/demo/preview',guard,(req,res)=>{
     res.set('Cache-Control','private, no-store');
