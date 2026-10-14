@@ -75,6 +75,10 @@ test('offline command center contains accessible chat, cards, history and diagno
   assert.equal(response.status,200);
   assert.match(response.headers.get('cache-control'),/no-store/);
   assert.match(response.headers.get('content-security-policy'),/connect-src 'self'/);
+  assert.match(response.headers.get('content-security-policy'),/script-src 'sha256-[A-Za-z0-9+/=]+'/);
+  assert.match(response.headers.get('content-security-policy'),/style-src 'sha256-[A-Za-z0-9+/=]+'/);
+  assert.doesNotMatch(response.headers.get('content-security-policy'),/unsafe-inline/);
+  assert.equal(response.headers.get('x-frame-options'),'DENY');
   assert.match(response.headers.get('content-security-policy'),/frame-ancestors 'none'/);
   assert.equal(response.headers.get('x-content-type-options'),'nosniff');
   const html=await response.text();
@@ -94,6 +98,9 @@ test('offline command center contains accessible chat, cards, history and diagno
   assert.match(html,/value="stale"/);
   assert.match(html,/local simulation time/);
   assert.match(html,/Hosting Settings/);
+  assert.match(html,/role="group" aria-label="Quick preview commands"/);
+  assert.match(html,/aria-describedby="scenarioHelp"/);
+  assert.match(html,/previewCommand'\).disabled=false/);
   assert.match(html,/fetch\('\/hosting/);
   assert.match(html,/fetch\('\/status/);
   assert.match(html,/fetch\('\/demo\/state/);

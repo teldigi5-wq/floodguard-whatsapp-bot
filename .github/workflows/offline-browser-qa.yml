@@ -1,0 +1,42 @@
+name: FloodGuard offline browser QA
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/demoCommandCenter.js'
+      - 'src/demoFixtures.js'
+      - 'src/demoReplies.js'
+      - 'src/demoServer.js'
+      - 'tests/offline-browser.test.cjs'
+      - '.github/workflows/offline-browser-qa.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: floodguard-offline-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromium:
+    name: Offline browser, accessibility and privacy checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked bot dependencies
+        run: npm ci
+      - name: Install browser QA dependencies only (not a production runtime dependency)
+        run: npm install --no-save --package-lock=false playwright@1.55.1 @axe-core/playwright@4.10.2
+      - name: Install isolated headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run local synthetic-only browser and WCAG smoke tests
+        env:
+          CI: 'true'
+        run: node --test tests/offline-browser.test.cjs

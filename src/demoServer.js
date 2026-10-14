@@ -1,5 +1,6 @@
 'use strict';
 const express=require('express');
+const {createHash}=require('node:crypto');
 const { createAdminGuard,validToken }=require('./adminAccess');
 const { describeHost }=require('./hosting');
 const { renderCommandCenter }=require('./demoCommandCenter');
@@ -13,19 +14,36 @@ function createDemoApp({token,port=8080,host='127.0.0.1'}={}) {
   if (host!=='127.0.0.1' && host!=='::1') throw new Error('Offline demo must bind to localhost only.');
   const app=express();
   app.disable('x-powered-by');
-  // Explicitly restrict the inline, self-contained demo to its own origin.
-  // This preview intentionally has no external resources, forms or frames.
+  // No inline JavaScript/style escape hatch. Hash only the static demo page's
+  // exact contents, then block all other scripts, network origins and frames.
+  const demoPage=renderCommandCenter();
+  function inlineHash(tag){
+    const startTag='<'+tag+'>';
+    const start=demoPage.indexOf(startTag);
+    const end=demoPage.indexOf('</'+tag+'>',start+startTag.length);
+    if(start<0||end<0)throw new Error('Missing demo '+tag+' content');
+    return "'sha256-"+createHash('sha256').update(demoPage.slice(start+startTag.length,end),'utf8').digest('base64')+"'";
+  }
+  const policy=[
+    "default-src 'none'","connect-src 'self'","img-src 'none'",
+    'script-src '+inlineHash('script'),'style-src '+inlineHash('style'),
+    "base-uri 'none'","form-action 'none'","frame-ancestors 'none'",
+    "object-src 'none'","upgrade-insecure-requests"
+  ].join('; ');
   app.use((_req,res,next)=>{
-    res.set('Content-Security-Policy',"default-src 'none'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+    res.set('Content-Security-Policy',policy);
+    res.set('Cache-Control','private, no-store');
     res.set('X-Content-Type-Options','nosniff');
     res.set('Referrer-Policy','no-referrer');
     res.set('Cross-Origin-Resource-Policy','same-origin');
+    res.set('X-Frame-Options','DENY');
+    res.set('Permissions-Policy','camera=(), microphone=(), geolocation=()');
     next();
   });
   const guard=createAdminGuard(token);
   app.get('/',guard,(_req,res)=>{
     res.set('Cache-Control','private, no-store');
-    res.type('html').send(renderCommandCenter());
+    res.type('html').send(demoPage);
   });
   app.get('/status',guard,(_req,res)=>{
     res.set('Cache-Control','private, no-store');

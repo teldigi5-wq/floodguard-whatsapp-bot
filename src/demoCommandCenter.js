@@ -29,7 +29,7 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.01em}
 .brandmark{display:grid;place-items:center;width:39px;height:39px;border-radius:13px;border:1px solid #3f7891;background:#112e3f;color:var(--accent);font-size:22px}
 .small{color:var(--muted);font-size:.8rem}
-.tag{display:inline-flex;align-items:center;gap:7px;font-size:.72rem;letter-spacing:.07em;font-weight:800;color:#ffdd9d;background:#372712;padding:8px 12px;border:1px solid #8a6336;border-radius:100px;text-transform:uppercase}
+.tag{display:inline-flex;align-items:center;gap:7px;font-size:.72rem;letter-spacing:.07em;font-weight:800;color:#ffdd9d;background:#372712;padding:8px 12px;border:1px solid #8a6336;border-radius:100px;text-transform:uppercase;max-width:100%;overflow-wrap:anywhere}
 .shell{max-width:1440px;margin:0 auto;padding:30px 24px 80px}
 .hero{display:flex;gap:20px;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
 h1,h2,h3,p{margin-top:0}
@@ -81,11 +81,11 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
 .diagnostic{border:1px solid #2b5062;border-radius:10px;padding:12px;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;row-gap:3px}
 .diagnostic strong{font-size:.81rem}
 .diagnostic .diagnostic-detail{font-size:.73rem;color:#b5ced8;grid-column:1/-1}
-.diagnostic .diagnostic-status{font-weight:850;color:#ffcf85;font-size:.69rem;letter-spacing:.02em}
+.diagnostic .diagnostic-status{font-weight:850;color:#ffcf85;font-size:.69rem;letter-spacing:.02em;overflow-wrap:anywhere;text-align:right}
 .footer{margin-top:18px;font-size:.74rem;color:#b8ced9;text-align:center}
 .sr-only{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap}
 @media(max-width:1080px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.content{grid-template-columns:minmax(0,1fr) minmax(270px,.9fr)}}
-@media(max-width:750px){.bar{padding:12px 16px}.shell{padding:22px 14px 70px}.hero{display:block}.content{grid-template-columns:1fr}.control{grid-template-columns:1fr}.control select{max-width:none}.section-head{padding:17px 16px 12px}.chat{padding:0 14px 14px}.tag{font-size:.65rem}.metric{padding:15px}}
+@media(max-width:750px){.bar{padding:12px 16px;flex-wrap:wrap;gap:8px}.shell{padding:22px 14px 70px}.hero{display:block}.content{grid-template-columns:1fr}.control{grid-template-columns:1fr}.control select{max-width:none}.section-head{padding:17px 16px 12px;flex-wrap:wrap}.chat{padding:0 14px 14px}.tag{font-size:.65rem}.metric{padding:15px}}
 @media(max-width:420px){.cards{grid-template-columns:1fr 1fr;gap:9px}.metric-value{font-size:.95rem}.brand small{display:none}.command-input{flex-direction:column;align-items:stretch}.primary{width:100%}.tag{padding:6px 9px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
@@ -97,12 +97,12 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
 <span class="tag">SIMULATION ONLY · NO LIVE DATA</span>
 </div></div>
 <main class="shell" id="main" tabindex="-1">
-<div class="hero"><div><div class="kicker">Local preview · Stage 1</div>
+<div class="hero"><div><div class="kicker">Local preview · Stage 2 QA</div>
 <h1>Offline FloodGuard Preview</h1>
 <p>Explore a simulated flood-monitoring workspace and command conversations without linking a WhatsApp account. No Firebase data, physical hardware, alert delivery or gate action is involved.</p></div></div>
 <div class="panel control">
-<div><label for="scenario">Simulation scenario</label><div class="help">These are fixed fictional readings. Switching scenarios never changes a real sensor.</div></div>
-<select id="scenario"><option value="offline">Offline — no sensor readings</option><option value="safe">SAFE — synthetic</option><option value="warning">WARNING — synthetic</option><option value="danger">DANGER — synthetic</option><option value="stale">STALE — reading expired</option></select>
+<div><label for="scenario">Simulation scenario</label><div id="scenarioHelp" class="help">These are fixed fictional readings. Switching scenarios never changes a real sensor.</div></div>
+<select id="scenario" aria-describedby="scenarioHelp"><option value="offline">Offline — no sensor readings</option><option value="safe">SAFE — synthetic</option><option value="warning">WARNING — synthetic</option><option value="danger">DANGER — synthetic</option><option value="stale">STALE — reading expired</option></select>
 </div>
 <div class="strip" role="note"><strong>Training interface only.</strong> No gate countdown, servo movement or real alert occurs. No WhatsApp messages are sent.</div>
 <div id="scenarioNote" class="scenario-note" role="status" aria-live="polite">Loading local fixture. No devices are connected.</div><section class="cards" aria-label="Synthetic sensor cards" id="sensorCards"></section>
@@ -112,7 +112,7 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
  <div class="section-head"><div><h2 id="chatTitle">Simulated WhatsApp chat</h2><p>Local browser conversation · never delivered</p></div><button id="clearChat" type="button" class="ghost">Clear preview</button></div>
  <div class="chat">
    <div id="chatLog" class="chat-log" role="log" aria-label="Synthetic command conversation" aria-live="polite" aria-relevant="additions text"><p class="placeholder">Choose a command to preview a synthetic reply.</p></div>
-   <div class="commands" aria-label="Quick preview commands">
+   <div class="commands" role="group" aria-label="Quick preview commands">
      <button class="chip" type="button" data-command="menu">menu</button><button class="chip" type="button" data-command="stats">stats</button><button class="chip" type="button" data-command="water">water</button><button class="chip" type="button" data-command="risk">risk</button><button class="chip" type="button" data-command="gate">gate</button><button class="chip" type="button" data-command="rain">rain</button><button class="chip" type="button" data-command="devices">devices</button><button class="chip" type="button" data-command="network">network</button><button class="chip" type="button" data-command="emergency">emergency</button>
    </div>
    <div class="command-input">
@@ -203,6 +203,8 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
     const version=++scenarioRevision;
     const chosen=scenario.value;
     commandRevision++;
+    // A previous preview may still be pending; invalidate it and restore the button.
+    $('previewCommand').disabled=false;
     $('scenarioNarration').textContent='Loading synthetic scenario. No remote sensor connection.';
     try {
       const res=await fetch('/demo/state?scenario='+encodeURIComponent(chosen),{cache:'no-store'});
