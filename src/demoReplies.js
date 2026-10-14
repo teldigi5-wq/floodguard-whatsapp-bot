@@ -26,6 +26,6 @@ function previewReply(command,scenario){
     network:()=>['Firebase: NOT CONNECTED','WhatsApp: NOT CONNECTED','ESP8266 network: NOT CONNECTED','No remote network query was made.'],
     emergency:()=>['Alarm example: '+s.alarm,'This is not an emergency notification service or a live warning.',unavailable]
   };
-  return [header,'','Command: '+command,'Scenario: '+scenario.toUpperCase(),'Sensor source: SYNTHETIC ONLY','',...lines[command]()].join('\n');
+  return [header,'','Command: '+command,'Scenario: '+scenario.toUpperCase(),'Sensor source: SYNTHETIC ONLY',...(scenario==='stale'?['CAUTION: Stale telemetry example; no current sensor reading is available.']:[]),'',...lines[command]()].join('\n');
 }
 module.exports={previewReply,READ_ONLY_COMMANDS,SCENARIOS};

@@ -47,7 +47,7 @@ test('synthetic scenarios are deterministic, labeled and never deliver or contro
   assert.equal(getDemoState('offline').cards.find(x=>x.id==='ultrasonic').value,'NOT AVAILABLE');
   assert.equal(getDemoState('stale').cards.find(x=>x.id==='esp8266').value,'NOT CONNECTED');
   assert.equal(getDemoState('safe').cards.find(x=>x.id==='firebase').value,'NOT CONNECTED');
-  assert.match(getDemoState('danger').cards[1].value,/example/);
+  assert.match(getDemoState('danger').cards.find(x=>x.id==='gate').value,/not running/);
   assert.throws(()=>getDemoState('__proto__'),RangeError);
   assert.throws(()=>getDemoState('subscribe'),RangeError);
 });
