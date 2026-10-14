@@ -184,7 +184,7 @@ function renderPage() {
 
   function renderHostingGuide() {
     const chosen = $('hostingProfile').value;
-    $('hostingGuide').textContent = (hostingGuides[chosen] || hostingGuides.pc).join('\n');
+    $('hostingGuide').textContent = (hostingGuides[chosen] || hostingGuides.pc).join('\\n');
   }
 
   async function loadHostingSettings() {

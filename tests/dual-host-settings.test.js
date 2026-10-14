@@ -53,3 +53,12 @@ test('premium setup UI exposes functioning hosting settings and read-only previe
   assert.match(page,/Preview only/);
   assert.doesNotMatch(page,/fetch\('\/hosting', \{ method: 'POST'/);
 });
+
+test('rendered Hosting Settings browser script parses as JavaScript',()=>{
+  const { Script }=require('node:vm');
+  const { renderPage }=require('../src/webUi');
+  const page=renderPage();
+  const match=page.match(/<script>([\s\S]*?)<\/script>/);
+  assert.ok(match,'embedded browser script is missing');
+  assert.doesNotThrow(()=>new Script(match[1]));
+});
