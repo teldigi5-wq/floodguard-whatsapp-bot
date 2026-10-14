@@ -41,7 +41,7 @@ p{color:var(--muted)}
 .panel{border:1px solid var(--border);border-radius:var(--radius);background:linear-gradient(170deg,rgba(15,37,51,.98),rgba(10,26,37,.98));box-shadow:0 18px 50px rgba(0,0,0,.15);min-width:0}
 .control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:18px;margin:24px 0}
 .control label{display:block;font-weight:720;font-size:.9rem;margin-bottom:5px}
-.help{color:var(--muted);font-size:.79rem}
+.help{color:var(--muted);font-size:.79rem}.chat-note{margin:10px 0 0}
 select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;padding:12px 14px;background:#091823}
 .cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
 .metric{padding:18px}
@@ -121,7 +121,7 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
     </select></label>
     <button id="previewCommand" class="primary" type="button">Preview reply</button>
    </div>
-   <p class="help" style="margin:10px 0 0">SIMULATED CHAT ONLY · subscribe, unsubscribe and physical-control commands are disabled.</p>
+   <p class="help chat-note">SIMULATED CHAT ONLY · subscribe, unsubscribe and physical-control commands are disabled.</p>
  </div>
 </section>
 <section class="panel" aria-labelledby="alertsTitle">

@@ -37,7 +37,9 @@ async function openDemo(browser,base,viewport,reducedMotion='reduce'){
   const page=await context.newPage();
   const unexpected=[];
   const errors=[];
+  const consoleErrors=[];
   page.on('pageerror',err=>errors.push(err.message));
+  page.on('console',msg=>{if(msg.type()==='error')consoleErrors.push(msg.text());});
   await page.route('**/*',route=>{
     const url=new URL(route.request().url());
     if(url.origin!==base||!allowed.has(url.pathname)){
@@ -50,14 +52,14 @@ async function openDemo(browser,base,viewport,reducedMotion='reduce'){
   assert.equal(res.status(),200);
   await page.waitForFunction(()=>document.querySelectorAll('#sensorCards .metric').length===8);
   await page.waitForFunction(()=>document.querySelectorAll('#hostingChecks .diagnostic').length===5);
-  return {page,context,unexpected,errors};
+  return {page,context,unexpected,errors,consoleErrors};
 }
 
 test('desktop, laptop, tablet and narrow mobile viewports have no horizontal overflow or external requests',async t=>{
   await withBrowser(async ({browser,base})=>{
     for(const viewport of viewports){
       await t.test(viewport.name,async ()=>{
-        const {page,context,unexpected,errors}=await openDemo(browser,base,viewport);
+        const {page,context,unexpected,errors,consoleErrors}=await openDemo(browser,base,viewport);
         try{
           const sizes=await page.evaluate(()=>({page:document.documentElement.scrollWidth,viewport:window.innerWidth}));
           assert.ok(sizes.page<=sizes.viewport+1,JSON.stringify({viewport,sizes}));
@@ -67,6 +69,7 @@ test('desktop, laptop, tablet and narrow mobile viewports have no horizontal ove
           assert.match(await page.locator('#scenarioNote').innerText(),/SYNTHETIC UNAVAILABLE/);
           assert.deepEqual(unexpected,[],'Browser must not request outside local fixtures');
           assert.deepEqual(errors,[],'Unexpected browser script error');
+          assert.deepEqual(consoleErrors,[],'Unexpected browser console errors or blocked CSP declarations');
           if(viewport.width===320||viewport.width===1440){
             const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa']).analyze();
             assert.deepEqual(audit.violations.map(x=>({id:x.id,impact:x.impact,nodes:x.nodes.map(y=>y.target)})),[]);
@@ -127,6 +130,29 @@ test('keyboard focus, reduced-motion, pending-preview cancellation and accessibl
       await page.waitForTimeout(330);
       assert.equal(await page.locator('#chatLog .bubble').count(),0,'Obsolete reply must be discarded');
       assert.match(await page.locator('#scenarioNarration').textContent(),/Synthetic scenario stale loaded/);
+      assert.deepEqual(unexpected,[]);
+      assert.deepEqual(errors,[]);
+    }finally{await context.close();}
+  });
+});
+
+test('failed local fixture, reply and hosting requests fail closed without inventing data',async ()=>{
+  await withBrowser(async ({browser,base})=>{
+    const {page,context,unexpected,errors}=await openDemo(browser,base,viewports[1]);
+    try{
+      await page.route('**/demo/state?**',route=>route.abort('failed'));
+      await page.locator('#scenario').selectOption('danger');
+      await page.waitForFunction(()=>document.querySelector('#scenarioNote').textContent.includes('LOCAL PREVIEW UNAVAILABLE'));
+      assert.equal(await page.locator('#sensorCards .metric').count(),0);
+      assert.equal(await page.locator('#alertHistory li').count(),0);
+      assert.match(await page.locator('#chatLog').innerText(),/No commands were sent/);
+      await page.route('**/demo/preview?**',route=>route.abort('failed'));
+      await page.locator('#previewCommand').click();
+      await page.waitForFunction(()=>document.querySelector('#chatLog').textContent.includes('Example unavailable'));
+      assert.match(await page.locator('#chatLog').innerText(),/No message was sent/);
+      await page.route('**/hosting',route=>route.abort('failed'));
+      await page.locator('#refreshHosting').click();
+      await page.waitForFunction(()=>document.querySelector('#hostingChecks').textContent.includes('LOCAL CHECK UNAVAILABLE'));
       assert.deepEqual(unexpected,[]);
       assert.deepEqual(errors,[]);
     }finally{await context.close();}

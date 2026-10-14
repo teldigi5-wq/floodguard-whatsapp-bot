@@ -98,6 +98,7 @@ test('offline command center contains accessible chat, cards, history and diagno
   assert.match(html,/value="stale"/);
   assert.match(html,/local simulation time/);
   assert.match(html,/Hosting Settings/);
+  assert.doesNotMatch(html,/ style="/,'Inline style would bypass the hash-based CSP');
   assert.match(html,/role="group" aria-label="Quick preview commands"/);
   assert.match(html,/aria-describedby="scenarioHelp"/);
   assert.match(html,/previewCommand'\).disabled=false/);
