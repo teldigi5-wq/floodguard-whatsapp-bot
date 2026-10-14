@@ -69,3 +69,19 @@ test('optional EC2 PM2 config advertises correct host mode and private loopback'
   assert.equal(ec2.apps[0].env.HOST,'127.0.0.1');
   assert.equal(ec2.apps[0].instances,1);
 });
+
+test('approved EC2 profile settings survive PM2 config evaluation',()=>{
+  const file=require.resolve('../ecosystem.portable.config.js');
+  const original=process.env.FLOODGUARD_HOST_MODE;
+  try {
+    process.env.FLOODGUARD_HOST_MODE='ec2';
+    delete require.cache[file];
+    const config=require('../ecosystem.portable.config.js');
+    assert.equal(config.apps[0].env.FLOODGUARD_HOST_MODE,'ec2');
+    assert.equal(config.apps[0].env.HOST,process.env.HOST||'127.0.0.1');
+  } finally {
+    if(original === undefined) delete process.env.FLOODGUARD_HOST_MODE;
+    else process.env.FLOODGUARD_HOST_MODE=original;
+    delete require.cache[file];
+  }
+});

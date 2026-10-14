@@ -43,3 +43,10 @@ test('data and auth state are not included in the repository',()=>{
   assert.match(ignore,/^data\/$/m);
   assert.match(ignore,/^\.env$/m);
 });
+
+test('PM2 loads host-owned private settings and never assumes cloud filesystem is ephemeral',()=>{
+  const src=fs.readFileSync(path.join(root,'ecosystem.portable.config.js'),'utf8');
+  assert.match(src,/require\('dotenv'\)\.config\(\{ path: path\.join\(__dirname, '\.env'\) \}\)/);
+  assert.match(src,/path\.resolve\(__dirname, process\.env\.DATA_PATH\)/);
+  assert.equal(pm2.apps[0].env.FLOODGUARD_HOST_MODE,process.env.FLOODGUARD_HOST_MODE||'pc');
+});
