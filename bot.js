@@ -71,7 +71,10 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'FloodGuard WhatsApp Bot' });
 });
 
-app.listen(PORT, '0.0.0.0', () => console.log(`Open http://localhost:${PORT}`));
+// Default to loopback: QR setup and status contain administrative data.
+// Explicit HOST=0.0.0.0 is for a secured proxy/network setup only.
+const HOST = process.env.HOST || '127.0.0.1';
+app.listen(PORT, HOST, () => console.log(`FloodGuard admin listening on ${HOST}:${PORT}`));
 
 function startFirebase() {
   if (stream) return;

@@ -5,7 +5,7 @@
 ### Real-time flood monitoring, cloud alerts and emergency-status messaging
 
 ![Node.js](https://img.shields.io/badge/Node.js-Bot-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
-![AWS](https://img.shields.io/badge/AWS-EC2-232F3E?style=for-the-badge&logo=amazonaws&logoColor=white)
+![Hosting](https://img.shields.io/badge/Hosting-Portable-232F3E?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-RTDB-FFCA28?style=for-the-badge&logo=firebase&logoColor=111827)
 ![WhatsApp](https://img.shields.io/badge/WhatsApp-Baileys-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)
 ![Arduino](https://img.shields.io/badge/Arduino-IoT-00878F?style=for-the-badge&logo=arduino&logoColor=white)
@@ -30,10 +30,18 @@ This repository focuses on the **monitoring and notification layer**. Physical g
 | Connectivity | ESP8266 |
 | Realtime backend | Firebase RTDB |
 | Messaging service | Node.js + Baileys |
-| Hosting | AWS EC2 + PM2 |
+| Hosting | Provider-independent Node.js + persistent disk (AWS deployment unavailable) |
 | User channel | WhatsApp |
 
 ---
+
+## AWS-independent recovery status
+
+**14 October 2026 — owner-reported hosting outage:** The original AWS account is banned/unavailable. The FloodGuard WhatsApp bot **worked when previously deployed on EC2**, but its current downtime is a hosting/account issue, not evidence of a code or Arduino/ESP8266 failure. No AWS instance or session backup is presumed accessible. The flashed Arduino and ESP8266 remain untouched.
+
+**New preferred model:** a self-hosted Node.js process on a machine with persistent storage (for example a no-charge VM if available, or a local PC when online). The application source does not require AWS. Setup routes now default to loopback binding; for remote access use a TLS-protected proxy or authenticated tunnel. See [recovery without AWS](docs/RECOVERY_WITHOUT_AWS.md).
+
+**Do not deploy from this draft PR until reviewed.** Neither a new host nor its administrative secrets have been provisioned, the original WhatsApp session might be unrecoverable, and Phase A Firebase rules remain un-published.
 
 ## ✅ Validation and deployment
 
