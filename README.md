@@ -2,308 +2,210 @@
 
 # 🌊 FloodGuard WhatsApp Bot
 
-### Real-time flood monitoring, cloud alerts and emergency-status messaging
+### IoT flood monitoring · Firebase telemetry · WhatsApp alerts
 
-![Node.js](https://img.shields.io/badge/Node.js-Bot-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
-![Hosting](https://img.shields.io/badge/Hosting-Portable-232F3E?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Firebase](https://img.shields.io/badge/Firebase-RTDB-FFCA28?style=for-the-badge&logo=firebase&logoColor=111827)
 ![WhatsApp](https://img.shields.io/badge/WhatsApp-Baileys-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)
-![Arduino](https://img.shields.io/badge/Arduino-IoT-00878F?style=for-the-badge&logo=arduino&logoColor=white)
+![Hosting](https://img.shields.io/badge/Hosting-Windows%20PC%20%7C%20Optional%20EC2-31486a?style=for-the-badge)
 [![FloodGuard CI](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/actions/workflows/ci.yml)
 
-**The cloud-notification layer of the FloodGuard IoT flood-monitoring ecosystem.**
+**Cloud-connected monitoring and messaging for the FloodGuard Arduino/ESP8266 flood-warning prototype.**
 
 </div>
 
 ---
 
-## 🎯 Project snapshot
+## Project status
 
-FloodGuard connects real water-level sensing hardware to Firebase and a cloud-hosted WhatsApp service so users can query system state and receive meaningful alerts when flood conditions change.
+| Component | Status |
+| --- | --- |
+| Arduino Uno and ESP8266 | Already flashed and previously working, per owner; currently offline for remote testing |
+| WhatsApp bot | Worked on the former AWS deployment; currently not hosted |
+| Windows PC hosting | Prepared in [draft PR #12](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/pull/12), Windows CI tested; **not installed on the owner's PC** |
+| Optional EC2 hosting | Supported by the same Node.js application; requires a new, accessible, approved VM |
+| Firebase privacy | Proposed rules are review-only; live anonymous read/write exposure has **not** been remediated |
 
-This repository focuses on the **monitoring and notification layer**. Physical gate control remains on the embedded controller side.
+This repository is the **messaging layer**. Physical flood sensing, alarms, and gate control remain with the embedded hardware. This educational prototype is **not a certified public flood-warning service**. Firebase may continue serving old readings while the hardware is offline; the bot identifies stale values and suppresses automatic alerts based on expired data.
 
-| Layer | Technology |
-|---|---|
-| Sensing | HC-SR04 ultrasonic sensor |
-| Controller | Arduino Uno |
-| Connectivity | ESP8266 |
-| Realtime backend | Firebase RTDB |
-| Messaging service | Node.js + Baileys |
-| Hosting | Provider-independent Node.js + persistent disk (AWS deployment unavailable) |
-| User channel | WhatsApp |
-
----
-
-## AWS-independent recovery status
-
-**14 October 2026 — owner-reported hosting outage:** The original AWS account is banned/unavailable. The FloodGuard WhatsApp bot **worked when previously deployed on EC2**, but its current downtime is a hosting/account issue, not evidence of a code or Arduino/ESP8266 failure. No AWS instance or session backup is presumed accessible. The flashed Arduino and ESP8266 remain untouched.
-
-**New preferred model:** a self-hosted Node.js process on a machine with persistent storage (for example a no-charge VM if available, or a local PC when online). The application source does not require AWS. Setup routes now default to loopback binding; for remote access use a TLS-protected proxy or authenticated tunnel. See [recovery without AWS](docs/RECOVERY_WITHOUT_AWS.md).
-
-**Do not deploy from this draft PR until reviewed.** Neither a new host nor its administrative secrets have been provisioned, the original WhatsApp session might be unrecoverable, and Phase A Firebase rules remain un-published.
-
-## ✅ Validation and deployment
-
-FloodGuard now separates **code validation** from **production deployment**.
-
-The CI workflow runs on pushes and pull requests and verifies the project with Node.js 20, a clean `npm ci` install, the repository's syntax/source checks, and required-file validation before changes are treated as healthy.
-
-Production deployment remains handled by the dedicated EC2 workflow, which updates the running service and preserves the deployment model independently from pull-request validation.
-
-This gives the repository two clear signals:
-
-- **CI** — proves the source tree is syntactically valid and structurally complete on a clean runner.
-- **Deployment** — updates the AWS EC2 service after accepted changes reach `main`.
-
----
-
-## 🏗️ End-to-end architecture
+## Architecture
 
 ```mermaid
 flowchart LR
-    Sensor[HC-SR04] --> Uno[Arduino Uno]
-    Uno --> ESP[ESP8266]
-    ESP --> Firebase[Firebase RTDB]
-    Firebase --> Bot[Node.js FloodGuard Bot]
-    Bot --> WA[WhatsApp / Baileys]
-    Uno --> Gate[Servo / Gate Controller]
+  Sensor["HC-SR04 / Rain Gauge"] --> Uno["Arduino Uno"]
+  Uno --> ESP["ESP8266"]
+  ESP --> RTDB["Firebase RTDB"]
+  RTDB --> Bot["Node.js + Baileys Bot"]
+  Bot --> WA["WhatsApp Commands & Alerts"]
+  Uno --> Gate["Servo / Buzzer / LCD"]
 ```
 
-```text
-Water level
-   ↓
-HC-SR04 sensor
-   ↓
-Arduino Uno
-   ↓
-ESP8266
-   ↓
-Firebase RTDB
-   ↓
-AWS EC2 Node.js bot
-   ↓
-WhatsApp commands + alerts
+The bot consumes **allowlisted Firebase child telemetry paths**. It provides the `menu`, `stats`, `water`, `risk`, `gate`, `rain`, `devices`, `network`, `emergency`, `subscribe` and `unsubscribe` commands. Its WhatsApp device-linking session and subscriber state live in a private, persistent `DATA_PATH` directory.
+
+## Deployment guide
+
+**Choose one host at a time.** You can run the same application either on your **Windows PC** or on an approved **EC2 Linux VM**. The Hosting Settings selector is a *read-only planning aid*; it cannot move the bot between machines.
+
+The PC setup is the recommended recovery path while the old AWS account/host is unavailable. Neither option requires reflashing the working Arduino or ESP8266.
+
+### 1. Windows PC — first installation
+
+**Prerequisites:** Windows 10/11, [Node.js 20+](https://nodejs.org/), [Git](https://git-scm.com/), internet access, and a phone authorized to link the WhatsApp account. Your PC must remain powered on and connected while you want the bot to respond.
+
+In **PowerShell**:
+
+```powershell
+git clone https://github.com/teldigi5-wq/floodguard-whatsapp-bot.git
+cd floodguard-whatsapp-bot
+
+# The PC deployment support is still in draft PR #12, not main.
+git fetch origin
+git switch --track origin/security/allowlisted-firebase-telemetry-v1
+
+# Validate the exact reviewed source before starting it.
+npm ci
+npm run check
+npm test
+
+# Creates .env, a strong random admin password and data/ if absent.
+# Existing .env is NOT overwritten.
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
+
+# Starts the one local WhatsApp bot instance.
+npm run start:pc
 ```
 
----
+The setup helper sets `FLOODGUARD_HOST_MODE=pc`, binds the admin page to `127.0.0.1`, and uses `./data` for persistent files. The token and session files remain on your computer, never in GitHub.
 
-## ⚡ Core capabilities
+**Open** `http://127.0.0.1:8080` on the **same PC**. At the browser sign-in prompt, use username `admin` and the value of `FLOODGUARD_SETUP_TOKEN` from your local private `.env` as the password. The page displays the real WhatsApp QR only when a new device link is required.
 
-- Real-time Firebase RTDB monitoring
-- `SAFE`, `WARNING`, `DANGER` and `SENSOR_ERROR` states
-- Transition-based warning and danger alerts
-- Recovery notifications
-- Gate countdown milestones and gate-state reporting
-- Stale-data protection
-- Sensor-error reporting
-- ESP8266/network-status reporting
-- Subscriber management
-- QR-based WhatsApp device linking
-- Persistent authentication storage on EC2
-- PM2 process management
-- No fabricated sensor or rainfall readings
+If a legitimate **private backup** of the old WhatsApp `auth/` directory exists, preserve and restore it only while the bot is stopped. If no backup is available from the unavailable AWS host, use the authorized phone to scan a **new QR code**. GitHub source code does not contain the old WhatsApp login.
 
----
+**Stop:** press `Ctrl+C` in the running terminal. **Start again:** run `npm run start:pc` in the project directory. Do not run a second bot instance against the same `data/auth` directory.
 
-## 💬 WhatsApp command surface
+### 2. Required private settings
 
-| Command | Purpose |
-|---|---|
-| `menu` | Show available commands |
-| `stats` | Current FloodGuard status |
-| `water` | Water-level information |
-| `risk` | Current flood-risk state |
-| `gate` | Gate state / countdown |
-| `devices` | Device information |
-| `rain` | Rain-gauge status |
-| `network` | ESP8266 / network status |
-| `emergency` | Emergency information |
-| `subscribe` | Subscribe to alerts |
-| `unsubscribe` | Stop alert subscription |
+`scripts/setup-windows.ps1` creates a starter `.env` on Windows. For another host, copy `.env.example` to a private `.env` and configure it yourself. Never commit the file or share its token.
 
----
+| Setting | Windows PC | Optional EC2 |
+| --- | --- | --- |
+| `FLOODGUARD_HOST_MODE` | `pc` | `ec2` |
+| `HOST` | `127.0.0.1` | `127.0.0.1`, via private tunnel / HTTPS proxy |
+| `PORT` | `8080` | `8080` or privately configured |
+| `DATA_PATH` | `./data` | Absolute path on an operator-verified persistent writable disk |
+| `FIREBASE_DATABASE_URL` | Existing Firebase RTDB HTTPS origin | Same approved RTDB origin |
+| `FLOODGUARD_SETUP_TOKEN` | Random token created by Windows helper | Generate a new strong secret privately |
+| `FLOODGUARD_STALE_MS` | `15000` by default | `15000` by default |
 
-## 🛡️ Reliability design
+`FIREBASE_AUTH` is empty only while the current RTDB read permissions allow the required public monitoring children. **This does not mean the live database is secure.** Firebase private-read and authenticated-write migrations are separate review and approval steps.
 
-### Stale data
+Never put the setup token into a URL, browser JavaScript, GitHub issue, CI log or repository. The private admin endpoints `/`, `/status`, `/qr` and `/hosting` require it. `/health` intentionally returns **generic liveness only**, not proof of WhatsApp or sensor connectivity.
 
-`FLOODGUARD_STALE_MS` prevents an old Firebase record from being presented as a fresh sensor reading.
+### 3. AWS EC2 — optional future deployment
 
-### Sensor errors
+This path applies **only to a newly accessible EC2 VM that you own or are authorized to administer**. It does **not** reactivate the previous unavailable AWS account, recover the previous `/data/auth`, or reuse the historical `.github/workflows/deploy.yml` target.
 
-Invalid or unavailable readings become `SENSOR_ERROR` instead of being converted into a fake safe/warning/danger value.
-
-### Transition alerts
-
-The bot responds to meaningful state transitions instead of spamming the same warning every time Firebase updates.
-
-### Authentication persistence
-
-The WhatsApp linked-device session is stored outside the source tree so application updates do not force a new QR scan every time.
-
----
-
-## 🔄 Data flow
-
-Firebase exposes live FloodGuard state under the project data path. The bot converts that state into user-facing status and alerts.
-
-Important values include:
-
-```text
-water.levelCm      calculated water level
-water.distanceCm   raw ultrasonic air-gap distance
-gate               current gate state
-alarm              alarm state
-esp8266            network/device state
-system             overall system state
-```
-
-The bot treats Firebase as the live communication boundary between the embedded hardware and the cloud messaging service.
-
----
-
-## ☁️ AWS EC2 deployment
-
-The production service is intended to run under **PM2** on AWS EC2.
-
-### Example environment
-
-```env
-PORT=8080
-DATA_PATH=/data
-FIREBASE_DATABASE_URL=YOUR_FIREBASE_RTDB_URL
-FIREBASE_AUTH=
-FLOODGUARD_STALE_MS=15000
-```
-
-> Never commit production secrets, credentials, `.env` files or WhatsApp authentication data.
-
-### Install / update
+Prepare an approved Linux VM with Node.js 20+, Git, outbound access to WhatsApp/Firebase, and a **persistent writable disk**. Restrict security-group inbound access. Install the reviewed draft code:
 
 ```bash
-cd ~/floodguard-whatsapp-bot
-git pull origin main
-npm ci --omit=dev || npm install --omit=dev
+git clone https://github.com/teldigi5-wq/floodguard-whatsapp-bot.git
+cd floodguard-whatsapp-bot
+git fetch origin
+git switch --track origin/security/allowlisted-firebase-telemetry-v1
+
+npm ci
 npm run check
-pm2 restart floodguard-whatsapp-bot --update-env
+npm test
+cp .env.example .env
+chmod 600 .env
+```
+
+**Privately edit `.env`** before starting. Set `FLOODGUARD_HOST_MODE=ec2`, `HOST=127.0.0.1`, your verified persistent `DATA_PATH`, and a fresh random `FLOODGUARD_SETUP_TOKEN` (at least 32 printable characters). The example file deliberately does **not** contain a real token. Ensure the chosen service account can read/write the data directory; do not put private auth on an ephemeral filesystem.
+
+```bash
+# First do a supervised foreground smoke test:
+npm run start:ec2
+
+# After that succeeds, stop it before starting ONE managed instance.
+npm install --global pm2
+pm2 start ecosystem.portable.config.js
+pm2 status
 pm2 save
 ```
 
-### Health checks
+Keep the admin HTTP listener bound to `127.0.0.1`. To access the QR screen from your own computer, use an **authorized SSH tunnel** (example; replace placeholders with your approved VM user and address):
 
 ```bash
-pm2 status
-pm2 logs floodguard-whatsapp-bot --lines 50
+ssh -L 8080:127.0.0.1:8080 USER@APPROVED_VM_HOST
 ```
 
-Healthy operation should show successful WhatsApp and Firebase connectivity.
+Then open `http://127.0.0.1:8080` **on your computer** while the tunnel is running. Alternatively configure an audited HTTPS-only reverse proxy, authentication and rate limits. **Never expose the Basic Auth setup page directly over public HTTP or open port 8080 to the internet.**
 
----
+The optional EC2 profile does **not** deploy itself. A future VM, its billing, private SSH access, backup and any automated deployment must be separately approved. Do not invoke the legacy GitHub EC2 deploy workflow until its destination has been redesigned and verified.
 
-## 🔐 Preserve linked-device authentication
+### 4. Verify after starting
 
-Production uses:
+1. On the host, open `http://127.0.0.1:8080/health`. `status: ok` means the **HTTP process** is serving requests, not that WhatsApp or the Arduino is online.
+2. Sign into the private setup page and verify WhatsApp status, Firebase connectivity, and the **Hosting Settings** panel (`PC` or `EC2` as configured). The settings panel is informational: it does not write credentials or change hosting.
+3. If WhatsApp requires linking, complete the QR scan using the authorized phone. Send `menu` and `stats`, then test `water`, `gate` and `network` after pairing.
+4. When hardware is offline, confirm the bot labels the previously stored sensor readings **STALE / last recorded**, with no invented live gate countdown or automatic alert based on expired readings.
+5. Verify data survives a normal process restart (`data/auth`, `subscribers.json`, `state.json`); do not reveal the contents. A writable directory alone does not guarantee cloud-volume durability.
 
-```text
-DATA_PATH=/data
-/data/auth
-```
+**If WhatsApp works but Firebase reports stale values**, that is expected while the already-flashed hardware is offline; it does not establish a hardware or firmware failure.
 
-**Do not delete `/data` or `/data/auth` during deployment.**
+### 5. Updates, rollback and persistent sessions
 
-Keeping authentication outside the repository allows source updates without destroying the linked WhatsApp session.
+- Record the exact **tested Git commit SHA** before an update. Stop the bot, privately back up `DATA_PATH` and your secret `.env`, and update code only after CI and operator review.
+- Keep the `auth/` directory outside source control, on persistent storage. Do not delete it merely to fix a network failure; a fresh QR link should be the last resort when the WhatsApp session is genuinely invalid.
+- Roll back to the previous reviewed SHA with a supervised checkout and the original private environment/session files if a new revision fails. Never run PC and EC2 instances linked to the same account concurrently.
+- PC foreground process: stop with `Ctrl+C` and restart with `npm run start:pc`. Reviewed Linux PM2 process: `pm2 restart floodguard-whatsapp-bot --update-env` after a controlled update.
+- Backups must remain encrypted/private. Do not upload WhatsApp credentials, Firebase tokens or subscriber phone identifiers to public GitHub or CI artifacts.
 
----
+### Deployment checklist
 
-## 📱 QR setup page
+- [ ] Node.js 20+, Git, internet and the chosen hosting account/machine available
+- [ ] Correct branch/commit checked out and `npm test` passed
+- [ ] Private `.env` configured, admin setup token strong, data directory persistent
+- [ ] One bot instance only; QR interface loopback-only or protected by SSH tunnel / HTTPS
+- [ ] Authorized WhatsApp pairing and `menu` / `stats` smoke test completed
+- [ ] Offline sensor readings clearly labeled stale; no false live alert
+- [ ] Private auth/session backup and a tested process restart
+- [ ] No legacy EC2 workflow run, Firebase rules publication, or hardware reflash without separate approval
 
-The setup page can:
+Full procedures: [PC & EC2 hosting settings](docs/DUAL_HOST_SETTINGS.md) · [Recovery without AWS](docs/RECOVERY_WITHOUT_AWS.md) · [Review PR #12](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/pull/12).
 
-- poll connection state automatically
-- display newly generated QR codes
-- hide expired displayed codes
-- show a waiting state while WhatsApp generates the next QR
-- switch to a connected state after linking
-- expose WhatsApp and Firebase connection status
+## Hosting Settings
 
-`QR_DISPLAY_TTL_MS` controls display lifetime only; new QR values still originate from the real Baileys/WhatsApp connection process.
+The protected setup page has a responsive Hosting Settings section showing the running profile, listener scope, and data-directory accessibility **without revealing the filesystem path or credentials**. Its PC/EC2 selector displays instructions **only**. Changing the actual runtime requires configuring and starting the bot on the intended host.
 
----
+## Monitoring and alerts
 
-## 🌐 FloodGuard ecosystem
+| Command | Information |
+| --- | --- |
+| `menu` / `help` | Available WhatsApp commands |
+| `stats` | Water, gate, risk, alarm and last-update summary |
+| `water` | Sensor air gap, calculated water level and thresholds |
+| `risk` / `emergency` | Reported system risk and alarm status |
+| `gate` | Recorded gate state and countdown, clearly marked if stale |
+| `rain` | Rain gauge availability and genuine reported rainfall |
+| `devices` | Last reported installed-device status |
+| `network` | Public ESP8266 connection state and RSSI, without private IP/Wi-Fi values |
+| `subscribe` / `unsubscribe` | Opt in or out of automatic WhatsApp transition alerts |
 
-This repository is one part of a larger system that includes:
+The bot suppresses transition alerts from invalid, future-dated or expired field timestamps. It reads nine allowlisted RTDB children and never requires the application to fetch the private ESP8266 IP or Wi-Fi fields.
 
-- embedded water-level sensing
-- Arduino control logic
-- ESP8266 connectivity
-- Firebase real-time synchronization
-- automated gate behavior
-- buzzer / LED / LCD alerts
-- mobile and web monitoring interfaces
-- AWS-hosted WhatsApp notifications
+## Quality gates and security
 
-That full path makes FloodGuard useful as a portfolio example of **IoT → cloud → user communication** rather than just an isolated bot.
+GitHub Actions test Node.js syntax, source/regression suites, Windows PC setup, and Firebase child-stream compatibility using **synthetic data in a Firebase Emulator**. See [CI](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/actions/workflows/ci.yml), [Windows setup workflow](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/actions/workflows/windows-pc-smoke.yml), and [Firebase contract workflow](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/actions/workflows/firebase-contract.yml).
 
----
-
-## 💼 What this project demonstrates
-
-- embedded-to-cloud system integration
-- realtime database consumption
-- event/state transition design
-- reliability around stale and invalid sensor data
-- Node.js service deployment
-- process management with PM2
-- persistent authentication handling
-- messaging UX for an IoT system
-- separation of CI validation from production deployment
-
----
-
-## 🗺️ Next upgrades
-
-- [ ] Add automated tests around state transitions and stale-data behavior
-- [ ] Add structured health/readiness endpoints for deployment monitoring
-- [ ] Add screenshots of the QR setup page and WhatsApp command responses
-- [ ] Add a complete FloodGuard architecture diagram spanning hardware, Firebase, web, mobile and messaging
-- [ ] Add versioned releases and deployment notes
+**CI is not a live deployment test.** The code in [PR #12](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/pull/12) remains a draft, not merged or running on the owner's PC/EC2. The currently published Firebase RTDB permissions still require a supervised private-read containment update and, later, independently approved authenticated device uploads. Neither the bot nor this README modifies production Firebase rules or the functioning Arduino/ESP8266 firmware.
 
 ---
 
 <div align="center">
 
-### Sense → Detect → Alert → Respond
+**FloodGuard** · Sense → Detect → Alert → Respond
 
-**Built by Poojana Kaveesh as part of the FloodGuard project.**
+Arduino / ESP8266 · Firebase · Node.js · WhatsApp · Flutter · Web
 
 </div>
-
-
-### Cross-repository emulator acceptance (not a live rollout)
-
-The new `Firebase bot contract — safe child streams` GitHub Action uses the candidate rules from a **pinned public website commit**, starts a local RTDB Emulator, and verifies `getLive()` and `streamLive()` using synthetic readings with test-only ESP8266 private values. It must pass before a real EC2 deployment is considered. It never contacts production Firebase or sends WhatsApp messages.
-
-### Supervised EC2 rollout only
-
-The review PR also changes the GitHub Actions EC2 deployment trigger from automatic `main` pushes to **manual `workflow_dispatch` only**. Once merged and tested, an operator must select the specific reviewed 40-character commit SHA, choose `DEPLOY`, and run the workflow. It refuses to deploy if the remote `main` SHA differs, or if necessary EC2 secrets are missing. The job targets the `floodguard-ec2-production` GitHub environment; configure required reviewers/environment protections separately if desired.
-
-**While this change is still in the draft PR, the production `main` branch retains its existing automatic deploy trigger. Do not merge other changes to bot `main` before this is approved.**
-
-### Hardware offline, telemetry last recorded
-
-The Arduino and ESP8266 are **already flashed and were working correctly**, according to the owner; the hardware is currently offline and unavailable for remote testing. **Do not reflash or restart the gate to validate this bot.** Firebase can remain connected even when its last sensor update is old. The bot must show historical measurements as **last recorded**, never infer live hardware from a Firebase connection, and must not issue automatic flood/gate alerts from expired or invalid timestamps. Offline UI changes can be tested with synthetic source values while EC2 deployment remains owner-approved and manual-only on this draft PR.
-
-### PC and EC2 hosting settings
-
-Runtime profiles: FLOODGUARD_HOST_MODE=pc or ec2. Start from an approved machine with npm run start:pc or npm run start:ec2. Both use the same bot and persistent local DATA_PATH. A Hosting Settings panel on the protected setup page shows the current profile and lets you preview the PC/EC2 configuration steps; it does not move or remotely deploy the running process.
-
-For Windows setup, use scripts/setup-windows.ps1 on your own PC. The script generates a private .env with a random admin token and a data directory without overwriting existing configuration. See docs/DUAL_HOST_SETTINGS.md for full instructions. Never run both PC and EC2 bots with the same WhatsApp linked session simultaneously.
-### Private WhatsApp setup access (draft migration requirement)
-
-The link/setup page `/`, `/status`, and `/qr` contain sensitive device-linking or diagnostic information. The draft update requires a private, random `FLOODGUARD_SETUP_TOKEN` (minimum 32 printable ASCII characters). Browsers authenticate with an HTTP **Basic Auth** prompt: username `admin`, password the secret token. The existing page, status polling and QR-image requests continue to use browser same-origin credentials. Tokens in query strings or URLs do not work. No WhatsApp QR values or phone identifiers are printed in public health responses.
-
-**Deployment prerequisite:** provision the secret in the **EC2 process environment** (not GitHub, not the repository, not browser JavaScript) and confirm the local admin UI through an **HTTPS-only** reverse proxy or an authenticated private tunnel. Basic Auth MUST NOT be used over plaintext public HTTP; do not expose port 8080 directly to the Internet. Enforce EC2 ingress allowlists, TLS and request rate limiting upstream. The public `/health` endpoint is limited to generic service liveness. If the token is not configured or too weak, setup routes return HTTP 503 rather than exposing WhatsApp QR data. Preserve `DATA_PATH/auth`; a rollout must not destroy the linked WhatsApp session.
-
-**Current production remains unchanged.** This behavior exists only in draft PR #12 until owner-approved supervised deployment. Confirm actual EC2 firewall, proxy, health checks, and environment configuration before merging or running the exact-SHA manual deploy.
