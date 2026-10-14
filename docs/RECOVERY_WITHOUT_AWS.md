@@ -3,7 +3,7 @@ Last reviewed: 14 October 2026
 
 ## What is established
 
-The owner reports the AWS account was banned and the bot no longer runs there. The **same bot previously worked when deployed**. The Arduino and ESP8266 have already been flashed, worked correctly, and are offline for remote testing. Their existing firmware and gate wiring are not part of this recovery. There is **no confirmed access** to the old EC2 instance, `/data/auth`, subscriber files or original service logs. Do not describe the bot as a code failure or claim that its old WhatsApp login is recoverable.
+The owner reports the previous AWS host is no longer accessible and the bot no longer runs there. The **same bot previously worked when deployed**. The Arduino and ESP8266 have already been flashed, worked correctly, and are offline for remote testing. Their existing firmware and gate wiring are not part of this recovery. There is **no confirmed access** to the old EC2 instance, `/data/auth`, subscriber files or original service logs. Do not describe the bot as a code failure or claim that its old WhatsApp login is recoverable.
 
 **Current state:** documentation and provider-independent code are staged in draft PR #12, not deployed. Existing legacy `.github/workflows/deploy.yml` targets inaccessible EC2 and must **not** be used as the recovery workflow.
 
@@ -43,7 +43,7 @@ Official cost/limitation reference pages (verify again before creating accounts)
 
 | Condition | Next step |
 | --- | --- |
-| AWS account remains suspended; no /data backup | Treat WhatsApp session as **not recoverable yet**; plan fresh QR pairing. |
+| legacy AWS host remains unavailable; no /data backup | Treat WhatsApp session as **not recoverable yet**; plan fresh QR pairing. |
 | Private secure backup of previous /data/auth exists | Restore to durable volume and test, but do not assume it is still authenticated. |
 | No PC available and no approved cloud VM | Keep bot **offline** while maintaining tested source; web/mobile continue independently. |
 | New host becomes available | Deploy once after explicit approval, confirm WhatsApp response and fallback, record rollback SHA and storage location. |
