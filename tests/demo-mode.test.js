@@ -73,7 +73,7 @@ test('demo page browser-side script is valid; normal setup stays normal',()=>{
 test('command preview returns synthetic read-only replies, never delivers messages',async()=>withDemo(async base=>{
   const headers={Authorization:auth};
   for(const command of ['menu','stats','water','risk','gate','rain','devices','network','emergency']){
-    for(const scenario of ['offline','safe','warning','danger']){
+    for(const scenario of ['offline','safe','warning','danger','stale']){
       const resp=await fetch(base+'/demo/preview?command='+command+'&scenario='+scenario,{headers});
       assert.equal(resp.status,200,command+'/'+scenario);
       assert.match(resp.headers.get('cache-control'),/no-store/);
@@ -82,7 +82,8 @@ test('command preview returns synthetic read-only replies, never delivers messag
       assert.equal(body.delivered,false);
       assert.match(body.reply,/NOT SENT · NOT LIVE · EXAMPLE ONLY/);
       assert.match(body.reply,/SYNTHETIC ONLY/);
-      if(scenario==='offline')assert.doesNotMatch(body.reply,/Water: (4\.0|9\.0|12\.0) cm/);
+      if(scenario==='offline'||scenario==='stale')assert.doesNotMatch(body.reply,/Water: (4\.0|9\.0|12\.0) cm/);
+      if(scenario==='stale')assert.match(body.reply,/Stale telemetry example/);
       if(command==='gate')assert.match(body.reply,/No gate control commands/);
     }
   }

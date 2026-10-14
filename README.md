@@ -237,3 +237,12 @@ Arduino / ESP8266 · Firebase · Node.js · WhatsApp · Flutter · Web
 **Built by Poojana Kaveesh**
 
 </div>
+
+
+## Stage 1 — Offline Command Center (draft PR #12)
+
+The approved development preview runs on a **Windows PC localhost only**, using `npm run start:demo` and the private admin token created with `scripts/setup-windows.ps1`. Open `http://127.0.0.1:8085` on the same computer. Run `npm run doctor` separately for the hosting preflight. Neither the demo process nor its Hosting Settings panel initiates a WhatsApp session, Baileys pairing, Firebase request, subscriber write, hardware command, or notification.
+
+**Synthetic fixtures:** OFFLINE, SAFE, WARNING, DANGER and STALE. Eight sensor/risk/connectivity cards, five fictional event-history entries and all nine approved read-only chat-command previews are **not live**. Chat timestamps are **local simulation times**, not sensor-event times. OFFLINE and STALE never display current sensor values. Firebase remains disconnected in every scenario. Hosting status reports only safe flags (loopback listener, profile, storage directory accessibility) and never secrets, Wi-Fi details or session content.
+
+**Security boundary:** The demo listener is bound to loopback, admin protected, no-store and controlled by a restrictive same-origin CSP. Do not expose it via a reverse proxy, tunnel or public firewall. The installed Arduino/ESP8266 firmware is not modified. To consider a real Windows or EC2 deployment in a *future explicitly approved stage*, review the existing hosting guide, run preflight and security tests, obtain authenticated RTDB write rules and a supervised rollout plan, then authorize WhatsApp pairing separately. A simulated green or red risk label is not an operational flood warning.

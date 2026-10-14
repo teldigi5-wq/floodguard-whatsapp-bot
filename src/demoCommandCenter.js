@@ -47,8 +47,8 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
 .metric{padding:18px}
 .metric-label{font-size:.79rem;color:#bdd4e0;display:block;margin-bottom:11px}
 .metric-value{display:block;font-size:clamp(.94rem,1.5vw,1.35rem);font-weight:800;overflow-wrap:anywhere;min-height:2.8rem;line-height:1.3}
-.metric-sub{display:block;font-size:.73rem;color:var(--muted);margin-top:9px}
-.strip{margin-bottom:16px;padding:12px 16px;background:#392811;border:1px solid #95652f;border-radius:13px;color:#ffe0a8;font-size:.82rem}
+.metric-sub{display:block;font-size:.73rem;color:var(--muted);margin-top:9px}.metric[data-risk="DANGER"] .metric-value{color:var(--danger)}.metric[data-risk="WARNING"] .metric-value,.metric[data-risk="STALE"] .metric-value{color:var(--warn)}.metric[data-risk="SAFE"] .metric-value{color:var(--safe)}
+.strip{margin-bottom:16px;padding:12px 16px;background:#392811;border:1px solid #95652f;border-radius:13px;color:#ffe0a8;font-size:.82rem}.scenario-note{border:1px solid #376479;border-radius:12px;background:#0c2837;padding:12px 16px;font-size:.81rem;color:#d6edf7;margin-bottom:14px}.scenario-note strong{color:#91e6f5}
 .content{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr);gap:16px;align-items:start}
 .column{display:grid;gap:16px;min-width:0}
 .section-head{padding:20px 20px 12px;display:flex;justify-content:space-between;align-items:start;gap:14px}
@@ -58,7 +58,7 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
 .bubble{max-width:92%;border:1px solid #315d70;padding:11px 13px;border-radius:14px;background:#142e3d;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.82rem}
 .bubble.user{align-self:flex-end;background:#174053;border-color:#3a7087}
 .bubble.system{align-self:flex-start}
-.bubble small{display:block;font-size:.68rem;letter-spacing:.02em;color:#c9dfea;margin-bottom:6px;font-weight:740}
+.bubble small{display:block;font-size:.68rem;letter-spacing:.02em;color:#c9dfea;margin-bottom:6px;font-weight:740}.bubble.system{border-left:3px solid var(--accent)}.bubble.user{border-right:3px solid #a1efff}
 .placeholder{color:#bed6e0;font-size:.85rem}
 .commands{display:flex;gap:7px;flex-wrap:wrap;padding:13px 0 9px}
 .chip{border:1px solid #47788a;background:#123246;padding:8px 11px;border-radius:999px;font-size:.76rem;min-height:40px}
@@ -102,10 +102,10 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
 <p>Explore a simulated flood-monitoring workspace and command conversations without linking a WhatsApp account. No Firebase data, physical hardware, alert delivery or gate action is involved.</p></div></div>
 <div class="panel control">
 <div><label for="scenario">Simulation scenario</label><div class="help">These are fixed fictional readings. Switching scenarios never changes a real sensor.</div></div>
-<select id="scenario"><option value="offline">Offline — no sensor readings</option><option value="safe">SAFE — synthetic</option><option value="warning">WARNING — synthetic</option><option value="danger">DANGER — synthetic</option></select>
+<select id="scenario"><option value="offline">Offline — no sensor readings</option><option value="safe">SAFE — synthetic</option><option value="warning">WARNING — synthetic</option><option value="danger">DANGER — synthetic</option><option value="stale">STALE — reading expired</option></select>
 </div>
 <div class="strip" role="note"><strong>Training interface only.</strong> No gate countdown, servo movement or real alert occurs. No WhatsApp messages are sent.</div>
-<section class="cards" aria-label="Synthetic sensor cards" id="sensorCards"></section>
+<div id="scenarioNote" class="scenario-note" role="status" aria-live="polite">Loading local fixture. No devices are connected.</div><section class="cards" aria-label="Synthetic sensor cards" id="sensorCards"></section>
 <div class="content">
 <div class="column">
 <section class="panel" aria-labelledby="chatTitle">
@@ -113,7 +113,7 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
  <div class="chat">
    <div id="chatLog" class="chat-log" role="log" aria-label="Synthetic command conversation" aria-live="polite" aria-relevant="additions text"><p class="placeholder">Choose a command to preview a synthetic reply.</p></div>
    <div class="commands" aria-label="Quick preview commands">
-     <button class="chip" type="button" data-command="stats">stats</button><button class="chip" type="button" data-command="water">water</button><button class="chip" type="button" data-command="risk">risk</button><button class="chip" type="button" data-command="gate">gate</button><button class="chip" type="button" data-command="emergency">emergency</button>
+     <button class="chip" type="button" data-command="menu">menu</button><button class="chip" type="button" data-command="stats">stats</button><button class="chip" type="button" data-command="water">water</button><button class="chip" type="button" data-command="risk">risk</button><button class="chip" type="button" data-command="gate">gate</button><button class="chip" type="button" data-command="rain">rain</button><button class="chip" type="button" data-command="devices">devices</button><button class="chip" type="button" data-command="network">network</button><button class="chip" type="button" data-command="emergency">emergency</button>
    </div>
    <div class="command-input">
     <label for="command">Select a read-only example command<select id="command">
@@ -135,12 +135,12 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
  <div id="diagnostics" class="diagnostics"></div>
 </section>
 <section class="panel" aria-labelledby="guideTitle">
- <div class="section-head"><div><h2 id="guideTitle">Local hosting</h2><p>Ready for PC demo · EC2 optional later</p></div></div>
+ <div class="section-head"><div><h2 id="guideTitle">Hosting Settings</h2><p>Windows PC is primary · EC2 optional after approval</p></div><button id="refreshHosting" class="ghost" type="button">Check local status</button></div>
  <div class="diagnostics">
   <div class="diagnostic"><strong>Session</strong><span class="diagnostic-status">NOT LINKED</span><span class="diagnostic-detail">WhatsApp login is intentionally disabled.</span></div>
-  <div class="diagnostic"><strong>Demo server</strong><span class="diagnostic-status">LOCAL ONLY</span><span class="diagnostic-detail">Protected by private admin credentials and bound to 127.0.0.1.</span></div>
+  <div class="diagnostic"><strong>Demo listener</strong><span class="diagnostic-status">LOOPBACK</span><span class="diagnostic-detail">Authenticated localhost-only preview. Never expose the listener to the public network.</span></div>
   <div class="diagnostic"><strong>Installed hardware</strong><span class="diagnostic-status">UNCHANGED</span><span class="diagnostic-detail">Arduino and ESP8266 firmware stays exactly as flashed.</span></div>
-  <p class="help">To exit, press Ctrl+C in the terminal. Start a real WhatsApp process only when you choose to pair an authorized account.</p>
+  <div id="hostingChecks" role="status" aria-live="polite" class="help">Checking local hosting configuration…</div><p class="help">Windows: run <code>npm run doctor</code> for a separate preflight. Stop this local demo with Ctrl+C. EC2 is optional later; follow the README TLS, firewall and secret-management guidance before any approved deployment. Do not pair WhatsApp or start a live process during this stage.</p>
  </div>
 </section>
 </div>
@@ -167,7 +167,8 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
   function clearChildren(node){node.replaceChildren();}
   function appendBubble(kind,title,body){
     const bubble=el('div','bubble '+kind);
-    bubble.append(el('small','',title),el('div','',body));
+    const stamp=new Intl.DateTimeFormat(undefined,{hour:'2-digit',minute:'2-digit'}).format(new Date());
+    bubble.append(el('small','',title+' · '+stamp+' local simulation time'),el('div','',body));
     if(log.querySelector('.placeholder'))clearChildren(log);
     log.append(bubble);
     while(log.children.length>14)log.removeChild(log.firstElementChild);
@@ -177,6 +178,7 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
     const root=$('sensorCards');clearChildren(root);
     for(const item of data.cards){
       const card=el('article','panel metric');
+      card.dataset.risk=item.id==='risk'?data.risk:'';
       card.append(el('span','metric-label',item.label),el('strong','metric-value',item.value),el('small','metric-sub',item.detail));
       root.append(card);
     }
@@ -209,12 +211,14 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
       if(version!==scenarioRevision)return;
       if(data.demoMode!==true||data.deliveryEnabled!==false||data.hardwareControlEnabled!==false||data.scenario!==chosen)throw Error('Untrusted simulation data');
       renderCards(data);renderAlerts(data);renderDiagnostics(data);
+      $('scenarioNote').textContent='SYNTHETIC '+data.risk+' · '+data.note+' Firebase and physical sensors are disconnected.';
       clearChildren(log);
       log.append(el('p','placeholder','Scenario: '+chosen.toUpperCase()+'. Choose a command to preview a simulated reply.'));
       $('scenarioNarration').textContent='Synthetic scenario '+chosen+' loaded. '+data.note;
     } catch {
       if(version!==scenarioRevision)return;
       clearChildren($('sensorCards'));clearChildren($('alertHistory'));clearChildren($('diagnostics'));
+      $('scenarioNote').textContent='LOCAL PREVIEW UNAVAILABLE · No reading, live alert or command can be inferred.';
       clearChildren(log);
       log.append(el('p','placeholder','Offline preview unavailable. No commands were sent.'));
       $('scenarioNarration').textContent='Preview unavailable; no real data was used.';
@@ -240,6 +244,32 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
       if(version===commandRevision)$('previewCommand').disabled=false;
     }
   }
+  async function loadHosting(){
+    const root=$('hostingChecks');
+    root.textContent='Checking protected local demo status…';
+    try {
+      const [hostRes,statusRes]=await Promise.all([fetch('/hosting',{cache:'no-store'}),fetch('/status',{cache:'no-store'})]);
+      if(!hostRes.ok||!statusRes.ok)throw Error('Local status unavailable');
+      const [hostInfo,status]=await Promise.all([hostRes.json(),statusRes.json()]);
+      if(hostInfo.demoMode!==true||hostInfo.bindScope!=='loopback'||hostInfo.profile!=='pc'||status.demoMode!==true||status.hasQr!==false||status.firebase!=='NOT_CONNECTED')throw Error('Unsafe or unexpected demo mode');
+      root.replaceChildren();
+      const items=[
+        ['Active profile','WINDOWS PC','Local simulation mode; EC2 remains an optional future target'],
+        ['Local listener','LOOPBACK ONLY','Protected browser requests on a local port; no remote exposure'],
+        ['Storage directory',hostInfo.storageAccessible?'ACCESSIBLE':'NOT VERIFIED','Directory access flag only; no session files or credentials are opened in demo'],
+        ['Real connections','DISABLED','WhatsApp unlinked, Firebase disconnected and physical hardware untouched'],
+        ['Preflight','SEPARATE CHECK','Run npm run doctor locally before an explicitly approved live process']
+      ];
+      for(const [name,value,detail] of items){
+        const row=el('div','diagnostic');
+        row.append(el('strong','',name),el('span','diagnostic-status',value),el('span','diagnostic-detail',detail));
+        root.append(row);
+      }
+    } catch {
+      root.textContent='LOCAL CHECK UNAVAILABLE · Do not assume a live process or device is healthy. No external network request was made.';
+    }
+  }
+  $('refreshHosting').addEventListener('click',loadHosting);
   scenario.addEventListener('change',loadScenario);
   $('previewCommand').addEventListener('click',previewCommand);
   $('command').addEventListener('keydown',event=>{
@@ -253,6 +283,7 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
     log.append(el('p','placeholder','Chat preview cleared locally. Nothing was sent.'));
   });
   loadScenario();
+  loadHosting();
 })();
 </script>
 </body></html>`;

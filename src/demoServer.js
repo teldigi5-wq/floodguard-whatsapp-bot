@@ -13,6 +13,15 @@ function createDemoApp({token,port=8080,host='127.0.0.1'}={}) {
   if (host!=='127.0.0.1' && host!=='::1') throw new Error('Offline demo must bind to localhost only.');
   const app=express();
   app.disable('x-powered-by');
+  // Explicitly restrict the inline, self-contained demo to its own origin.
+  // This preview intentionally has no external resources, forms or frames.
+  app.use((_req,res,next)=>{
+    res.set('Content-Security-Policy',"default-src 'none'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+    res.set('X-Content-Type-Options','nosniff');
+    res.set('Referrer-Policy','no-referrer');
+    res.set('Cross-Origin-Resource-Policy','same-origin');
+    next();
+  });
   const guard=createAdminGuard(token);
   app.get('/',guard,(_req,res)=>{
     res.set('Cache-Control','private, no-store');
