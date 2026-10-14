@@ -15,6 +15,7 @@ const { getLive, streamLive } = require('./src/firebase');
 const { commandReply, processLiveChange } = require('./src/floodguard');
 const { renderPage } = require('./src/webUi');
 const { createAdminGuard } = require('./src/adminAccess');
+const { describeHost } = require('./src/hosting');
 
 fs.mkdirSync(DATA_PATH, { recursive: true });
 const AUTH = path.join(DATA_PATH, 'auth');
@@ -23,6 +24,8 @@ fs.mkdirSync(AUTH, { recursive: true });
 const PORT = Number(process.env.PORT || 8080);
 const app = express();
 const requireSetupAdmin = createAdminGuard();
+const HOST = process.env.HOST || '127.0.0.1';
+const hostConfig = describeHost({mode:process.env.FLOODGUARD_HOST_MODE,host:HOST,port:PORT,dataPath:DATA_PATH});
 
 let qr = null;
 let qrGeneratedAt = 0;
@@ -56,6 +59,11 @@ app.get('/status', requireSetupAdmin, (_req, res) => {
   });
 });
 
+app.get('/hosting', requireSetupAdmin, (_req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.json(hostConfig);
+});
+
 app.get('/qr', requireSetupAdmin, (_req, res) => {
   res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
   if (!qr || wa !== 'WAITING_FOR_QR_SCAN') return res.sendStatus(404);
@@ -73,7 +81,6 @@ app.get('/health', (_req, res) => {
 
 // Default to loopback: QR setup and status contain administrative data.
 // Explicit HOST=0.0.0.0 is for a secured proxy/network setup only.
-const HOST = process.env.HOST || '127.0.0.1';
 app.listen(PORT, HOST, () => console.log(`FloodGuard admin listening on ${HOST}:${PORT}`));
 
 function startFirebase() {

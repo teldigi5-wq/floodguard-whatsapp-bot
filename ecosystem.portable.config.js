@@ -14,6 +14,7 @@ module.exports = {
     max_memory_restart: '450M',
     env: {
       NODE_ENV: 'production',
+      FLOODGUARD_HOST_MODE: process.env.FLOODGUARD_HOST_MODE || 'pc',
       HOST: process.env.HOST || '127.0.0.1',
       PORT: process.env.PORT || '8080',
       DATA_PATH: process.env.DATA_PATH || path.join(__dirname, 'data')

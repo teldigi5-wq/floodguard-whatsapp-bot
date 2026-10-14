@@ -295,6 +295,11 @@ The review PR also changes the GitHub Actions EC2 deployment trigger from automa
 
 The Arduino and ESP8266 are **already flashed and were working correctly**, according to the owner; the hardware is currently offline and unavailable for remote testing. **Do not reflash or restart the gate to validate this bot.** Firebase can remain connected even when its last sensor update is old. The bot must show historical measurements as **last recorded**, never infer live hardware from a Firebase connection, and must not issue automatic flood/gate alerts from expired or invalid timestamps. Offline UI changes can be tested with synthetic source values while EC2 deployment remains owner-approved and manual-only on this draft PR.
 
+### PC and EC2 hosting settings
+
+Runtime profiles: FLOODGUARD_HOST_MODE=pc or ec2. Start from an approved machine with npm run start:pc or npm run start:ec2. Both use the same bot and persistent local DATA_PATH. A Hosting Settings panel on the protected setup page shows the current profile and lets you preview the PC/EC2 configuration steps; it does not move or remotely deploy the running process.
+
+For Windows setup, use scripts/setup-windows.ps1 on your own PC. The script generates a private .env with a random admin token and a data directory without overwriting existing configuration. See docs/DUAL_HOST_SETTINGS.md for full instructions. Never run both PC and EC2 bots with the same WhatsApp linked session simultaneously.
 ### Private WhatsApp setup access (draft migration requirement)
 
 The link/setup page `/`, `/status`, and `/qr` contain sensitive device-linking or diagnostic information. The draft update requires a private, random `FLOODGUARD_SETUP_TOKEN` (minimum 32 printable ASCII characters). Browsers authenticate with an HTTP **Basic Auth** prompt: username `admin`, password the secret token. The existing page, status polling and QR-image requests continue to use browser same-origin credentials. Tokens in query strings or URLs do not work. No WhatsApp QR values or phone identifiers are printed in public health responses.
