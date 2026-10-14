@@ -32,3 +32,7 @@ Run `npm run doctor` after setting up the private `.env` and the durable data di
 ## Offline preview without pairing WhatsApp
 
 Run the Windows setup helper once, `npm run doctor`, then `npm run start:demo`. Open `http://127.0.0.1:8085` on the same machine, authenticate with your existing private admin token, and use the synthetic SAFE/WARNING/DANGER/Offline scenarios. This is an isolated Express server: no Baileys connection, QR pairing, Firebase request, WhatsApp alert or gate action is possible. To stop it, press Ctrl+C. Keep the real bot stopped until you decide to connect WhatsApp.
+
+### Synthetic WhatsApp command preview
+
+In offline demo mode, choose a synthetic sensor state and one of the supported read-only command examples. The authenticated localhost-only `/demo/preview` endpoint produces **simulated, not-sent** text from a pure formatting module. It never reads Firebase, WhatsApp sessions, subscriber state, or physical gate controls. Subscription and any other mutating commands are rejected. The preview helps review UX wording; it does **not** prove live command parity or WhatsApp connectivity.

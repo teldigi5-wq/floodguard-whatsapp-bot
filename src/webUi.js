@@ -50,6 +50,10 @@ function renderPage({demoMode = false} = {}) {
     .demoField strong{font-size:16px;color:#d7f4ff}
     .demoInfo{color:#91b6c9;font-size:11px;line-height:1.6;text-align:center}
     @media(max-width:540px){.demoFields{grid-template-columns:1fr}}
+    .demoCommandPanel{border:1px solid var(--line);border-radius:16px;padding:13px;background:rgba(10,25,40,.62);display:grid;gap:10px}
+    .demoCommandPanel label{font-size:12px;color:#c9eaf9;font-weight:700}
+    .demoReply{padding:12px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;color:#d1e8f5;background:rgba(0,0,0,.26);min-height:110px;max-height:230px;overflow:auto}
+    .demoGuard{font-size:10px;font-weight:650;color:#ffc861;line-height:1.6}
   </style>
 </head>
 <body>
@@ -79,6 +83,22 @@ function renderPage({demoMode = false} = {}) {
       <div class="demoField"><span>Alerts sent</span><strong>NONE (disabled)</strong></div>
     </div>
     <p class="demoInfo" aria-live="polite" id="demoExplanation">No current measurements. The already-flashed hardware does not need to be online to preview this interface.</p>
+    <div class="demoCommandPanel">
+      <label for="demoCommand">Preview a WhatsApp command — no account connection</label>
+      <select id="demoCommand" class="hostingSelect" aria-describedby="demoCommandWarning">
+        <option value="stats" selected>stats — system summary</option>
+        <option value="menu">menu — command list</option>
+        <option value="water">water — water level</option>
+        <option value="risk">risk — flood risk</option>
+        <option value="gate">gate — gate status</option>
+        <option value="rain">rain — rain gauge</option>
+        <option value="devices">devices — hardware status</option>
+        <option value="network">network — connectivity</option>
+        <option value="emergency">emergency — alarm example</option>
+      </select>
+      <p class="demoGuard" id="demoCommandWarning">SYNTHETIC RESPONSE ONLY · Nothing is sent to WhatsApp. Subscription commands are disabled.</p>
+      <div id="demoReply" class="demoReply" role="status" aria-live="polite">Loading synthetic command example…</div>
+    </div>
   </div>
 </section>
 </div></div>
@@ -130,7 +150,27 @@ function renderPage({demoMode = false} = {}) {
     $('demoWater').textContent=scenario.water;
     $('demoGate').textContent=scenario.gate;
     $('demoExplanation').textContent=scenario.note;
+    if (launchedAsDemo) loadDemoReply();
   }
+  let demoRequestId=0;
+  async function loadDemoReply() {
+    if (!launchedAsDemo) return;
+    const requestId=++demoRequestId;
+    const command=$('demoCommand').value;
+    const scenario=$('demoScenario').value;
+    try {
+      const url='/demo/preview?command='+encodeURIComponent(command)+'&scenario='+encodeURIComponent(scenario);
+      const response=await fetch(url,{cache:'no-store'});
+      if (!response.ok) throw new Error('Demo example unavailable');
+      const result=await response.json();
+      if(requestId!==demoRequestId)return;
+      if(result.demoMode!==true || result.delivered!==false || typeof result.reply!=='string')throw new Error('Invalid demo response');
+      $('demoReply').textContent=result.reply;
+    } catch {
+      if(requestId===demoRequestId)$('demoReply').textContent='SIMULATION ONLY · Example temporarily unavailable. No message was sent.';
+    }
+  }
+  $('demoCommand').addEventListener('change',loadDemoReply);
   $('demoScenario').addEventListener('change',renderDemoScenario);
   renderDemoScenario();
 

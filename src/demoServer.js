@@ -3,6 +3,7 @@ const express=require('express');
 const { createAdminGuard,validToken }=require('./adminAccess');
 const { describeHost }=require('./hosting');
 const { renderPage }=require('./webUi');
+const { previewReply }=require('./demoReplies');
 
 // Synthetic admin/UI preview. DO NOT import bot.js, src/firebase.js,
 // Baileys, any session store, or any real networking client here.
@@ -27,6 +28,17 @@ function createDemoApp({token,port=8080,host='127.0.0.1'}={}) {
   app.get('/hosting',guard,(_req,res)=>{
     res.set('Cache-Control','private, no-store');
     res.json({...describeHost({mode:'pc',host,port}),demoMode:true});
+  });
+  app.get('/demo/preview',guard,(req,res)=>{
+    res.set('Cache-Control','private, no-store');
+    try {
+      const scenario=req.query.scenario;
+      const command=req.query.command;
+      if(typeof scenario!=='string'||typeof command!=='string')return res.status(400).json({error:'Choose a supported command and scenario.'});
+      res.json({demoMode:true,delivered:false,reply:previewReply(command,scenario)});
+    } catch {
+      res.status(400).json({error:'Only approved read-only demo commands and scenarios are supported.'});
+    }
   });
   // There is no WhatsApp QR code, no session and no pairing route.
   app.get('/qr',guard,(_req,res)=>res.sendStatus(404));

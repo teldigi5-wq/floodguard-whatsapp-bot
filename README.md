@@ -50,7 +50,7 @@ The PC setup is the recommended recovery path while the old AWS account/host is 
 
 ### Offline preview — no WhatsApp pairing required
 
-If you **do not want to link WhatsApp yet**, you can inspect the premium FloodGuard administration UI and select simulated SAFE/WARNING/DANGER/Offline states using an isolated local server. This preview does not import or initialize WhatsApp/Baileys, connect to Firebase, use real telemetry, or perform hardware/gate actions. It contains **no QR pairing** and sends **no alerts**.
+If you **do not want to link WhatsApp yet**, you can inspect the premium FloodGuard administration UI and select simulated SAFE/WARNING/DANGER/Offline states using an isolated local server. This preview does not import or initialize WhatsApp/Baileys, connect to Firebase, use real telemetry, or perform hardware/gate actions. It contains **no QR pairing** and sends **no alerts**. The demo also includes a **read-only WhatsApp command preview** for `menu`, `stats`, `water`, `risk`, `gate`, `rain`, `devices`, `network` and `emergency`. All responses use synthetic examples. `subscribe` and `unsubscribe` are deliberately unavailable, and no user messages are sent.
 
 After checking out the reviewed draft branch on your Windows PC:
 
