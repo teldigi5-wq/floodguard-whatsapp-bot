@@ -83,6 +83,12 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
 .diagnostic .diagnostic-detail{font-size:.73rem;color:#b5ced8;grid-column:1/-1}
 .diagnostic .diagnostic-status{font-weight:850;color:#ffcf85;font-size:.69rem;letter-spacing:.02em;overflow-wrap:anywhere;text-align:right}
 .footer{margin-top:18px;font-size:.74rem;color:#b8ced9;text-align:center}
+.acceptance{border:0;margin:0;padding:0 18px 7px;display:grid;gap:10px;min-width:0}
+.acceptance-check{display:flex;align-items:flex-start;gap:12px;border:1px solid #2b5062;border-radius:11px;background:#0a202d;padding:12px;font-size:.82rem;color:#e0eff7;cursor:pointer}
+.acceptance-check input{accent-color:#77dff7;flex:none;width:20px;height:20px;margin:0}
+.acceptance-check span{flex:1;min-width:0}
+.acceptance-help{padding:2px 18px 0;margin:0 0 8px}
+.acceptance-status{padding:0 18px 18px;margin:0;color:#fbe0a8;font-size:.8rem;font-weight:650}
 .sr-only{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap}
 @media(max-width:1080px){.cards{grid-template-columns:repeat(2,minmax(0,1fr))}.content{grid-template-columns:minmax(0,1fr) minmax(270px,.9fr)}}
 @media(max-width:750px){.bar{padding:12px 16px;flex-wrap:wrap;gap:8px}.shell{padding:22px 14px 70px}.hero{display:block}.content{grid-template-columns:1fr}.control{grid-template-columns:1fr}.control select{max-width:none}.section-head{padding:17px 16px 12px;flex-wrap:wrap}.chat{padding:0 14px 14px}.tag{font-size:.65rem}.metric{padding:15px}}
@@ -142,6 +148,19 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
   <div class="diagnostic"><strong>Installed hardware</strong><span class="diagnostic-status">UNCHANGED</span><span class="diagnostic-detail">Arduino and ESP8266 firmware stays exactly as flashed.</span></div>
   <div id="hostingChecks" role="status" aria-live="polite" class="help">Checking local hosting configuration…</div><p class="help">Windows: run <code>npm run doctor</code> for a separate preflight. Stop this local demo with Ctrl+C. EC2 is optional later; follow the README TLS, firewall and secret-management guidance before any approved deployment. Do not pair WhatsApp or start a live process during this stage.</p>
  </div>
+</section>
+<section class="panel" aria-labelledby="acceptanceTitle">
+ <div class="section-head"><div><h2 id="acceptanceTitle">Operator acceptance · offline only</h2><p>Manual checkmarks · not a deployment authorization</p></div><button id="resetAcceptance" class="ghost" type="button">Reset checks</button></div>
+ <fieldset class="acceptance" aria-describedby="acceptanceHelp">
+  <legend class="sr-only">Manual offline acceptance checks</legend>
+  <label class="acceptance-check"><input type="checkbox" data-acceptance="banner"><span>I verified the simulation-only banner and that values are fictional.</span></label>
+  <label class="acceptance-check"><input type="checkbox" data-acceptance="offline"><span>I switched to OFFLINE and saw no current sensor measurements.</span></label>
+  <label class="acceptance-check"><input type="checkbox" data-acceptance="stale"><span>I switched to STALE and saw no current measurements or live alert.</span></label>
+  <label class="acceptance-check"><input type="checkbox" data-acceptance="chat"><span>I reviewed a synthetic chat reply marked NOT SENT.</span></label>
+  <label class="acceptance-check"><input type="checkbox" data-acceptance="host"><span>I verified local hosting reports disconnected services and no pairing QR.</span></label>
+ </fieldset>
+ <p id="acceptanceHelp" class="help acceptance-help">Checkmarks are temporary browser state; they are not evidence of real hardware, Firebase or WhatsApp tests. Nothing is stored or transmitted.</p>
+ <p id="acceptanceStatus" class="acceptance-status" role="status" aria-live="polite">0 of 5 manually reviewed. No deployment approval granted.</p>
 </section>
 </div>
 </div>
@@ -271,6 +290,16 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
       root.textContent='LOCAL CHECK UNAVAILABLE · Do not assume a live process or device is healthy. No external network request was made.';
     }
   }
+  const manualChecks=[...document.querySelectorAll('[data-acceptance]')];
+  function updateAcceptance(){
+    const count=manualChecks.filter(input=>input.checked).length;
+    $('acceptanceStatus').textContent=count+' of '+manualChecks.length+' manually reviewed. No deployment approval granted.';
+  }
+  for(const input of manualChecks)input.addEventListener('change',updateAcceptance);
+  $('resetAcceptance').addEventListener('click',()=>{
+    for(const input of manualChecks)input.checked=false;
+    updateAcceptance();
+  });
   $('refreshHosting').addEventListener('click',loadHosting);
   scenario.addEventListener('change',loadScenario);
   $('previewCommand').addEventListener('click',previewCommand);

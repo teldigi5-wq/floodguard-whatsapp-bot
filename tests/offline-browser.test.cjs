@@ -136,6 +136,27 @@ test('keyboard focus, reduced-motion, pending-preview cancellation and accessibl
   });
 });
 
+test('operator checklist is accessible and ephemeral, never authorizes deployment',async ()=>{
+  await withBrowser(async ({browser,base})=>{
+    const {page,context,unexpected,errors}=await openDemo(browser,base,viewports[1]);
+    try{
+      const checks=page.locator('[data-acceptance]');
+      assert.equal(await checks.count(),5);
+      assert.match(await page.locator('#acceptanceStatus').innerText(),/0 of 5 manually reviewed/);
+      for(let i=0;i<5;i++)await checks.nth(i).check();
+      assert.match(await page.locator('#acceptanceStatus').innerText(),/5 of 5 manually reviewed. No deployment approval granted/);
+      await page.locator('#resetAcceptance').click();
+      assert.match(await page.locator('#acceptanceStatus').innerText(),/0 of 5 manually reviewed/);
+      await checks.first().check();
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.waitForFunction(()=>document.querySelectorAll('#sensorCards .metric').length===8);
+      assert.equal(await page.locator('[data-acceptance]:checked').count(),0,'Checkmarks must not persist or leak');
+      assert.deepEqual(unexpected,[]);
+      assert.deepEqual(errors,[]);
+    }finally{await context.close();}
+  });
+});
+
 test('failed local fixture, reply and hosting requests fail closed without inventing data',async ()=>{
   await withBrowser(async ({browser,base})=>{
     const {page,context,unexpected,errors}=await openDemo(browser,base,viewports[1]);

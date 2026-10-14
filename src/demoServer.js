@@ -30,7 +30,7 @@ function createDemoApp({token,port=8080,host='127.0.0.1'}={}) {
     "base-uri 'none'","form-action 'none'","frame-ancestors 'none'",
     "object-src 'none'","upgrade-insecure-requests"
   ].join('; ');
-  app.use((_req,res,next)=>{
+  app.use((req,res,next)=>{
     res.set('Content-Security-Policy',policy);
     res.set('Cache-Control','private, no-store');
     res.set('X-Content-Type-Options','nosniff');
@@ -38,6 +38,14 @@ function createDemoApp({token,port=8080,host='127.0.0.1'}={}) {
     res.set('Cross-Origin-Resource-Policy','same-origin');
     res.set('X-Frame-Options','DENY');
     res.set('Permissions-Policy','camera=(), microphone=(), geolocation=()');
+    // Avoid browser DNS-rebinding or cross-site requests reaching a privileged
+    // localhost demo. Check the *actual listener port*, not user-supplied data.
+    const authority=(host==='::1'?'[::1]':'127.0.0.1')+':'+req.socket.localPort;
+    if(req.get('host')!==authority)return res.status(421).type('text/plain').send('Unexpected local request authority.');
+    const origin=req.get('origin');
+    if(origin && origin!=='http://'+authority)return res.status(403).type('text/plain').send('Cross-origin access is not allowed.');
+    const site=req.get('sec-fetch-site');
+    if(site && site!=='none' && site!=='same-origin')return res.status(403).type('text/plain').send('Cross-site access is not allowed.');
     next();
   });
   const guard=createAdminGuard(token);

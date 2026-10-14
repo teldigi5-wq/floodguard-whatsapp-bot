@@ -82,7 +82,7 @@ test('offline command center contains accessible chat, cards, history and diagno
   assert.match(response.headers.get('content-security-policy'),/frame-ancestors 'none'/);
   assert.equal(response.headers.get('x-content-type-options'),'nosniff');
   const html=await response.text();
-  for(const element of ['sensorCards','scenario','chatLog','chatTitle','command','previewCommand','alertHistory','diagnostics','clearChat','main','hostingChecks','refreshHosting','scenarioNote']){
+  for(const element of ['sensorCards','scenario','chatLog','chatTitle','command','previewCommand','alertHistory','diagnostics','clearChat','main','hostingChecks','refreshHosting','scenarioNote','acceptanceStatus','resetAcceptance','acceptanceHelp']){
     assert.match(html,new RegExp('id="'+element+'"'),element);
   }
   assert.match(html,/SIMULATION ONLY · NO LIVE DATA/);
@@ -98,6 +98,9 @@ test('offline command center contains accessible chat, cards, history and diagno
   assert.match(html,/value="stale"/);
   assert.match(html,/local simulation time/);
   assert.match(html,/Hosting Settings/);
+  assert.match(html,/Operator acceptance · offline only/);
+  assert.match(html,/No deployment approval granted/);
+  assert.match(html,/data-acceptance="stale"/);
   assert.doesNotMatch(html,/ style="/,'Inline style would bypass the hash-based CSP');
   assert.match(html,/role="group" aria-label="Quick preview commands"/);
   assert.match(html,/aria-describedby="scenarioHelp"/);

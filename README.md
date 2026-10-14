@@ -260,3 +260,8 @@ The demo's Content Security Policy allows only hashed static inline CSS and Java
 **Current safe workflow:** `npm ci` → `npm test` → `npm run doctor` → `npm run drill:offline` → `npm run start:demo`. This rehearses only fictional sensor state and a disposable synthetic backup. It **does not** restore any WhatsApp auth files, validate real storage encryption, activate a real bot, contact Firebase, pair WhatsApp or touch the flashed Arduino/ESP8266. The Windows CI also starts and stops only its **own localhost demo child process**, twice, to check restart readiness.
 
 [Full Stage 3 acceptance, incident response and separate live-approval gates](docs/STAGE3_OFFLINE_OPERATIONS.md). In particular, passing Stage 3 is **not** authorization to run `start:pc` or `start:ec2`; those are still future separately approved live processes.
+
+
+## Stage 4 — Offline security hardening and manual operator checks
+
+The local demo now validates HTTP Host/port and rejects unrelated browser origins and cross-site requests in addition to its private Basic-Auth, localhost binding and hashed CSP. Five browser-memory-only manual checkboxes help a local operator review synthetic status, stale/offline honesty and no-pairing behavior; **even 5/5 checkmarks never grant permission to deploy**. CI includes negative request-security tests. Read [Stage 4 security review and Firebase approval boundaries](docs/STAGE4_SECURITY_REVIEW.md). No production policy, live bot, hardware, mobile visibility or deployment was changed.
