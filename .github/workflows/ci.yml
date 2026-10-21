@@ -34,6 +34,9 @@ jobs:
       - name: Syntax and source validation
         run: npm run check
 
+      - name: Verify private administration routes
+        run: npm test
+
       - name: Verify required project files
         shell: bash
         run: |
