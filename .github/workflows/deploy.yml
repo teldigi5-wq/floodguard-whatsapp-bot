@@ -41,6 +41,9 @@ jobs:
           script: |
             set -e
             cd ~/floodguard-whatsapp-bot
+            # Fail before touching the running checkout if the private admin token has
+            # not been provisioned. No secrets are written to logs.
+            node -e "require('dotenv').config(); const t=process.env.FLOODGUARD_SETUP_TOKEN || ''; if(t.length < 32 || t.length > 512 || !/^[!-~]+$/.test(t)) { console.error('Secure administration token missing; deployment aborted before git reset.'); process.exit(1); }"
             git fetch origin
             git reset --hard origin/main
             npm ci --omit=dev || npm install --omit=dev
