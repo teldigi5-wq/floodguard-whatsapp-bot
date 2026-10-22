@@ -1,8 +1,7 @@
 name: Deploy FloodGuard to EC2
 
 on:
-  push:
-    branches: [main]
+  # Explicit owner action only; avoid unnoticed production changes on each main push.
   workflow_dispatch:
 
 permissions:
@@ -30,7 +29,7 @@ jobs:
 
       - name: Deploy to EC2
         if: steps.config.outputs.configured == 'true'
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         with:
           host: ${{ env.EC2_HOST }}
           username: ec2-user
@@ -44,8 +43,10 @@ jobs:
             # Fail before touching the running checkout if the private admin token has
             # not been provisioned. No secrets are written to logs.
             node -e "require('dotenv').config(); const t=process.env.FLOODGUARD_SETUP_TOKEN || ''; if(t.length < 32 || t.length > 512 || !/^[!-~]+$/.test(t)) { console.error('Secure administration token missing; deployment aborted before git reset.'); process.exit(1); }"
-            git fetch origin
+            # Fail closed on unsupported or unpatched Node lines before changing the checkout.
+            node -e "const v=process.versions.node.split('.').map(Number); const ok=(v[0]===22&&(v[1]>23||(v[1]===23&&v[2]>=4)))||(v[0]===24&&(v[1]>22||(v[1]===22&&v[2]>=1))); if(!ok){console.error('Patched Node LTS 22.23.4+ or 24.22.1+ is required'); process.exit(1)}"
+            git fetch origin main
             git reset --hard origin/main
-            npm ci --omit=dev || npm install --omit=dev
+            npm ci --omit=dev
             pm2 restart floodguard-whatsapp-bot --update-env || pm2 start ecosystem.config.js
             pm2 save
