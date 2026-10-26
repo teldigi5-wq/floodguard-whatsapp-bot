@@ -53,9 +53,17 @@ function cdpsocket(url) {
     async connected() {
       if(ws.readyState===WebSocket.OPEN)return;
       if(ws.readyState!==WebSocket.CONNECTING)throw Error('CDP socket unavailable');
-      await Promise.race([
-        once(ws,'open'),sleep(8000).then(()=>{throw Error('CDP WebSocket startup timeout');})
-      ]);
+      let startupTimer;
+      try {
+        await Promise.race([
+          once(ws,'open'),
+          new Promise((_,reject)=>{
+            startupTimer=setTimeout(()=>reject(Error('CDP WebSocket startup timeout')),8000);
+          })
+        ]);
+      } finally {
+        clearTimeout(startupTimer);
+      }
     },
     call(method,params={}) {
       assert.equal(ws.readyState,WebSocket.OPEN,'Chrome must be connected');
