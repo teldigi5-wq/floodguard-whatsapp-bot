@@ -290,7 +290,19 @@ function eventKey(prefix, live, extra = '') {
   return `${prefix}:${sourceTs}:${extra}`;
 }
 
-async function processLiveChange(sock, live) {
+// Serialize state transitions. Without this gate, overlapping Firebase SSE
+// callbacks can read the same prior state, deliver duplicate DANGER alerts,
+// and overwrite one another's saved transition state.
+let alertProcessingTail = Promise.resolve();
+function processLiveChange(sock, live) {
+  const next = alertProcessingTail.then(() => processLiveChangeSerial(sock, live));
+  // Keep later callbacks processable after any individual malformed event.
+  // The caller still receives the original rejection for diagnostics.
+  alertProcessingTail = next.catch(() => {});
+  return next;
+}
+
+async function processLiveChangeSerial(sock, live) {
   if (!live) return;
 
   let currentLevel = level(live);
