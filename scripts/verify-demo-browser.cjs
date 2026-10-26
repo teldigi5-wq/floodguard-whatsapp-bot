@@ -205,4 +205,4 @@ function cdpsocket(url) {
     if(server) await new Promise(resolve=>server.close(()=>resolve()));
     rmSync(workdir,{recursive:true,force:true});
   }
-})().catch(e=>{console.error('Offline Chrome E2E failed:',e.message);process.exitCode=1;});
+})().catch(e=>{console.error('Offline Chrome E2E failed:',e.stack || e.message);process.exitCode=1;});
