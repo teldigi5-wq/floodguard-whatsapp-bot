@@ -46,4 +46,15 @@ function createAdminGuard(token = process.env[TOKEN_ENV]) {
   };
 }
 
-module.exports = { createAdminGuard, validToken };
+// Administrative Basic authentication must never be exposed on a plaintext
+// network listener. Remote administration belongs behind a trusted private
+// tunnel or HTTPS reverse proxy that connects to this loopback service.
+function resolveAdminHost(raw = process.env.HOST) {
+  if (raw == null || raw === '') return '127.0.0.1';
+  if (typeof raw !== 'string' || !['127.0.0.1', '::1', 'localhost'].includes(raw)) {
+    throw new Error('Refusing non-loopback FloodGuard admin HOST; use a trusted HTTPS reverse proxy or SSH tunnel.');
+  }
+  return raw;
+}
+
+module.exports = { createAdminGuard, validToken, resolveAdminHost };
