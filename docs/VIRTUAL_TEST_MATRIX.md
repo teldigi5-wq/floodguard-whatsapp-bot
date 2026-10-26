@@ -16,6 +16,17 @@ The current active service entrypoint is `bot.js` (CommonJS), with runtime modul
 | Configuration preflight | Patched Node version gate, private token format, HTTPS URL and data-dir checks, secret redaction | No live credentials, durability or remote-host validation |
 | Dependencies | `npm ci` lockfile checks, production `npm audit --omit=dev --audit-level=high`, Pino/dotenv contract tests | A successful audit is not a supply-chain security guarantee |
 
+## Measured coverage snapshot (GitHub PR #33)
+
+Source: [Node.js 24.22.1 CI job](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/actions/runs/40316677742/job/121550906381), 2026-10-26. The job passed **51 tests**, then reran the 51 active JavaScript tests with Node's built-in coverage reporting:
+
+- Instrumented `src/` modules: **94.04% lines**, **73.80% branches**, **88.24% functions** in that Node 24 run.
+- Specifically: `src/firebase.js` **92.86% lines / 71.60% branches**; `src/floodguard.js` **86.49% lines / 68.57% branches**.
+- This is coverage of **loaded source modules only**. The live `bot.js` startup path and historical TypeScript files were **not imported** by these tests and are not included in those numbers. Browser and hardware functionality are also not covered.
+- The Node.js 22 report includes test files and therefore produces a different `all files` denominator; **do not compare its overall percentage directly** with Node 24's `src/`-only report.
+
+Branch coverage, untested startup behavior, delivery failure paths and hardware dependencies remain meaningful gaps. These figures are observations from a named CI run, not a claim of comprehensive security assurance.
+
 ## Inactive historical test path — do not count as passing
 
 The repository also contains `tests/format.test.ts` using Vitest and a historical TypeScript/serverless code path (`src/app.ts`, `src/handler.ts`, etc.). The active package manifest does **not** configure a Vitest test command or TypeScript compile/build step, and `npm test` does **not** execute `*.test.ts` files. Therefore:
