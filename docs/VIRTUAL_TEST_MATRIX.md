@@ -46,6 +46,10 @@ Synthetic partial-send tests exercise one accepted fake WhatsApp send and one re
 
 An offline-only synthetic test opens the exact allowlisted child streams and simulates an unexpected **clean EOF** after the first complete snapshot. A clean remote EOF is now classified as a stream outage and surfaced through the existing redacted error event, allowing the bot's current Firebase health listener to switch to `RECONNECTING`. A deliberate `stream.stop()` is not an outage. The checks do **not** connect to Firebase production, prove Firebase Emulator permissions, or establish an actual network reconnect success rate.
 
+## Reconnected SSE baseline integrity
+
+Offline red/green tests now simulate a complete first water snapshot, remote child EOF, automatic reconnect and a premature partial `/status` PATCH. A new child stream does **not** rejoin the composite LIVE snapshot until it receives a fresh root `put` event; the old child values are cleared when its former stream ends. This prevents old SAFE air-gap measurements from being combined with a new stream's partial status to imply a misleading fresh reading. A fully reinitialized DANGER water snapshot is accepted. Tests use fake `ReadableStream` responses only; they do not prove production Firebase delivery, source authenticity, or real network recovery.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
