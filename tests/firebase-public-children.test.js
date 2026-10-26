@@ -80,3 +80,18 @@ test('all child SSE streams compose into one redacted coherent snapshot', async 
     liveStream.stop();
   }
 });
+
+
+test('chunked Firebase snapshot cannot bypass 256 KiB memory bound', async () => {
+  let pulls = 0;
+  const chunk = new Uint8Array(128 * 1024).fill(32);
+  globalThis.fetch = async () => new Response(new ReadableStream({
+    pull(controller) {
+      pulls++;
+      controller.enqueue(chunk);
+      if (pulls > 40) controller.close();
+    }
+  }), { status: 200 });
+  await assert.rejects(getLive(), /Firebase telemetry response too large/);
+  assert.ok(pulls < 40 * CHANNELS.length, 'reader must reject before buffering unlimited data');
+});
