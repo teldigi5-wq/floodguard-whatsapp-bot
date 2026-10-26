@@ -10,7 +10,7 @@ const path = require('node:path');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'floodguard-virtual-test-'));
 process.env.DATA_PATH = dir;
 const { subscribe, getState } = require('../src/store');
-const { commandReply, processLiveChange, level, isStale } = require('../src/floodguard');
+const { commandReply, processLiveChange, level, isStale, normalizeGate } = require('../src/floodguard');
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 function synthetic(distanceCm, timestamp = Date.now()) {
@@ -88,4 +88,46 @@ test('virtual WhatsApp receives state transitions, not duplicate or stale flood 
   assert.equal(sent.length, 3);
   assert.match(sent[2].text, /FLOODGUARD RECOVERY/);
   assert.equal(getState().dataStale, false);
+});
+
+
+test('sensor out-of-range or explicitly null distance cannot fake safety', async () => {
+  for (const input of [0, -1, 400.01, 401, 1000, 'Infinity', 'bad', null, '']) {
+    const snapshot = synthetic(input);
+    snapshot.water.levelCm = 0; // potentially stale Firebase child
+    snapshot.water.status = 'SAFE';
+    assert.equal(level(snapshot), 'UNKNOWN', 'out-of-range or missing distance: ' + input);
+    const reply = await commandReply('synthetic-test-contact', 'water', async () => snapshot);
+    assert.match(reply, /Actual Level: NOT AVAILABLE/, String(input));
+    assert.match(reply, /Status: \*UNKNOWN\*/, String(input));
+  }
+  const errored = { water: { levelCm: 0, status: 'SENSOR_ERROR' } };
+  assert.equal(level(errored), 'SENSOR_ERROR',
+    'an explicit error status defeats potentially stale derived level');
+  assert.equal(level({ water: { levelCm: 0, status: 'UNKNOWN' } }), 'SAFE',
+    'direct-only valid level provider remains supported');
+  assert.equal(level(synthetic(400)), 'SAFE', 'HC-SR04 upper valid range remains accepted');
+});
+
+test('unknown servo telemetry must not turn an OPEN gate into CLOSED', () => {
+  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: null, countdownSeconds: null } }), 'OPEN');
+  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: '', countdownSeconds: '' } }), 'OPEN');
+  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: 'bad', countdownSeconds: null } }), 'OPEN');
+  assert.equal(normalizeGate({ gate: { angle: null, countdownSeconds: null } }), 'UNKNOWN');
+  assert.equal(normalizeGate({ gate: { status: 'CLOSED', angle: 0, countdownSeconds: null } }), 'CLOSED');
+  assert.equal(normalizeGate({ gate: { status: 'OPENING_WARNING', angle: null, countdownSeconds: 5 } }), 'COUNTDOWN');
+});
+
+test('future or invalid telemetry timestamps cannot bypass freshness gate', async () => {
+  const now = Date.now();
+  const tooFuture = synthetic(14, now + 60_000);
+  assert.equal(isStale(tooFuture), true);
+  assert.equal(isStale(synthetic(14, now + 3000)), false,
+    'limited clock skew may be tolerated');
+  assert.equal(isStale(synthetic(14, now - 120_000)), true);
+  assert.equal(isStale({ system: { lastUpdate: null } }), true);
+  assert.equal(isStale({ system: { lastUpdate: 'garbage' } }), true);
+  const sent = [];
+  await processLiveChange({sendMessage: async (_to, msg) => sent.push(msg)}, tooFuture);
+  assert.equal(sent.length, 0, 'future-dated danger must not broadcast an unverified alert');
 });
