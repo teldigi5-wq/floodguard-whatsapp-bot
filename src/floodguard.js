@@ -270,14 +270,17 @@ async function commandReply(jid, text, getLive) {
 
 async function sendAll(sock, text) {
   const subscribers = [...getSubscribers()];
-  if (!subscribers.length) return;
+  let failures = 0;
   for (const jid of subscribers) {
     try {
       await sock.sendMessage(jid, { text });
-    } catch (e) {
-      console.error('WhatsApp send failed', jid, e.message);
+    } catch {
+      failures += 1;
+      // Never put subscriber IDs, thrown URLs or auth tokens into CI/host logs.
+      console.error('FloodGuard alert delivery failed (details redacted)');
     }
   }
+  return failures;
 }
 
 function opening(live) {
@@ -346,6 +349,13 @@ async function processLiveChangeSerial(sock, live) {
     return;
   }
 
+  // Persist an aggregate failure signal; this is not a retry or
+  // confirmation that a remote device received earlier messages.
+  let failedSends = 0;
+  const sendAlert = async text => {
+    failedSends += await sendAll(sock, text);
+  };
+
   const previousLevel = state.level || 'UNKNOWN';
   const previousGate = state.gateStatus || 'UNKNOWN';
   let procedureId = state.procedureId || null;
@@ -356,13 +366,13 @@ async function processLiveChangeSerial(sock, live) {
     const key = eventKey('level', live, `${previousLevel}->${currentLevel}`);
     if (key !== lastEventKey) {
       if (currentLevel === 'WARNING') {
-        await sendAll(sock, `🟡 *FLOODGUARD WARNING*\n\nWater has entered the warning zone.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n💧 Status: WARNING\n🛡️ Risk: ${risk(live)}\n🚧 Gate: ${currentGate}`);
+        await sendAlert( `🟡 *FLOODGUARD WARNING*\n\nWater has entered the warning zone.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n💧 Status: WARNING\n🛡️ Risk: ${risk(live)}\n🚧 Gate: ${currentGate}`);
       } else if (currentLevel === 'DANGER') {
-        await sendAll(sock, `🚨 *FLOODGUARD DANGER*\n\nCritical water level detected.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: DANGER\n🛡️ Risk: ${risk(live)}\n🚨 Alarm: ${boolText(live?.alarm?.active)}\n\nFloodGuard is monitoring the gate-opening sequence.`);
+        await sendAlert( `🚨 *FLOODGUARD DANGER*\n\nCritical water level detected.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: DANGER\n🛡️ Risk: ${risk(live)}\n🚨 Alarm: ${boolText(live?.alarm?.active)}\n\nFloodGuard is monitoring the gate-opening sequence.`);
       } else if (currentLevel === 'SAFE' && ['WARNING', 'DANGER'].includes(previousLevel)) {
-        await sendAll(sock, `✅ *FLOODGUARD RECOVERY*\n\nWater conditions have returned to SAFE.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: ${currentGate}\n🛡️ Risk: ${risk(live)}`);
+        await sendAlert( `✅ *FLOODGUARD RECOVERY*\n\nWater conditions have returned to SAFE.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: ${currentGate}\n🛡️ Risk: ${risk(live)}`);
       } else if (currentLevel === 'SENSOR_ERROR') {
-        await sendAll(sock, '⚠️ *FLOODGUARD SENSOR ALERT*\n\nThe water sensor is not providing a valid reading. FloodGuard will not fabricate a water level.');
+        await sendAlert( '⚠️ *FLOODGUARD SENSOR ALERT*\n\nThe water sensor is not providing a valid reading. FloodGuard will not fabricate a water level.');
       }
       lastEventKey = key;
     }
@@ -371,7 +381,7 @@ async function processLiveChangeSerial(sock, live) {
   if (opening(live) && !procedureId) {
     procedureId = `gate-${Number(live?.system?.lastUpdate) || Date.now()}`;
     sentCountdown = [];
-    await sendAll(sock, `🚨 *DAM GATE OPENING WARNING*\n\nThe DANGER condition has started the gate countdown.\n\n⏱️ Opening in: ${v(countdown, ' seconds')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: COUNTDOWN`);
+    await sendAlert( `🚨 *DAM GATE OPENING WARNING*\n\nThe DANGER condition has started the gate countdown.\n\n⏱️ Opening in: ${v(countdown, ' seconds')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: COUNTDOWN`);
   }
 
   // Current physical countdown is 10 seconds, so send useful milestones only.
@@ -383,26 +393,26 @@ async function processLiveChangeSerial(sock, live) {
           : milestone === 10
             ? '🚨 *DAM GATE OPENING SOON*'
             : '⚠️ *DAM GATE COUNTDOWN*';
-        await sendAll(sock, `${title}\n\n⏱️ *${milestone} SECOND${milestone === 1 ? '' : 'S'}*\n\n🔴 Water: ${currentLevel}\n🚧 Gate: COUNTDOWN`);
+        await sendAlert( `${title}\n\n⏱️ *${milestone} SECOND${milestone === 1 ? '' : 'S'}*\n\n🔴 Water: ${currentLevel}\n🚧 Gate: COUNTDOWN`);
         sentCountdown.push(milestone);
       }
     }
   }
 
   if (currentGate === 'OPEN' && previousGate !== 'OPEN') {
-    await sendAll(sock, `🚧 *FLOODGUARD DAM GATE OPEN*\n\nThe prototype dam gate is OPEN.\n\n📐 Servo Angle: ${v(live?.gate?.angle, '°')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: ${currentLevel}\n🛡️ Risk: ${risk(live)}`);
+    await sendAlert( `🚧 *FLOODGUARD DAM GATE OPEN*\n\nThe prototype dam gate is OPEN.\n\n📐 Servo Angle: ${v(live?.gate?.angle, '°')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: ${currentLevel}\n🛡️ Risk: ${risk(live)}`);
     procedureId = null;
     sentCountdown = [];
   }
 
   if (procedureId && currentGate === 'CLOSED' && currentLevel !== 'DANGER') {
-    await sendAll(sock, `✅ *GATE OPENING CANCELLED*\n\nThe countdown ended because the confirmed water state changed.\n\n🚧 Gate: CLOSED\n💧 Water: ${currentLevel}`);
+    await sendAlert( `✅ *GATE OPENING CANCELLED*\n\nThe countdown ended because the confirmed water state changed.\n\n🚧 Gate: CLOSED\n💧 Water: ${currentLevel}`);
     procedureId = null;
     sentCountdown = [];
   }
 
   if (previousGate === 'OPEN' && currentGate === 'CLOSED') {
-    await sendAll(sock, `🔒 *DAM GATE CLOSED*\n\nThe prototype gate has returned to 0°.\n\n💧 Water: ${currentLevel}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}`);
+    await sendAlert( `🔒 *DAM GATE CLOSED*\n\nThe prototype gate has returned to 0°.\n\n💧 Water: ${currentLevel}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}`);
   }
 
   saveState({
@@ -415,6 +425,11 @@ async function processLiveChangeSerial(sock, live) {
     lastEventKey,
     lastSeenAt: Date.now(),
     lastSourceAt: sourceAt,
+    alertSendFailureCount:
+      (Number.isSafeInteger(state.alertSendFailureCount) && state.alertSendFailureCount >= 0
+        ? state.alertSendFailureCount : 0) + failedSends,
+    deliveryDegraded: failedSends > 0 || state.deliveryDegraded === true,
+    lastDeliveryFailureAt: failedSends > 0 ? Date.now() : state.lastDeliveryFailureAt,
     dataStale: false
   });
 }
