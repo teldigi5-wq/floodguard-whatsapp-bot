@@ -42,7 +42,7 @@ function getDemoState(name){
       {id:'arduino',name:'Arduino + ESP8266',status:'NOT CONTACTED',detail:'Existing flashed firmware and sensors untouched'},
       {id:'gate',name:'Physical gate controls',status:'DISABLED',detail:'No countdown, servo movement or real alert occurs'},
       {id:'storage',name:'Session / subscriber storage',status:'NOT USED',detail:'Demo does not open, read or write WhatsApp session files'},
-      {id:'preflight',name:'Live-host preflight',status:'NOT RUN',detail:'Run npm run doctor separately before any approved live setup'}
+      {id:'preflight',name:'Live-host preflight',status:'NOT RUN',detail:'Live-host preflight is not performed by this offline demo; see deployment guidance'}
     ]
   };
 }
