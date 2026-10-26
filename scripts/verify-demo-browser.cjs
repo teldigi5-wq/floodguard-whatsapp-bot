@@ -194,8 +194,12 @@ function cdpsocket(url) {
       assert.equal(measured.selectLabel,true);
       assert.equal(measured.visible,true);
     }
-    assert.equal(await evaluate("(()=>{const s=document.querySelector('.skip');"+
-      "s.focus();return document.activeElement===s && parseFloat(getComputedStyle(s).top)>=0;})()"),true);
+    await cdp.call('Page.bringToFront');
+    const skip=await evaluate("(()=>{const s=document.querySelector('.skip');"+
+      "s.focus();return {active:document.activeElement===s,matched:s.matches(':focus'),"+
+      "computedTop:getComputedStyle(s).top,rectY:s.getBoundingClientRect().y};})()");
+    assert.ok(skip.active && skip.matched && parseFloat(skip.computedTop)>=0,
+      'keyboard skip navigation not visible: '+JSON.stringify(skip));
     assert.deepEqual(external,[],'Offline preview attempted an external network request');
     console.log('PASS: headless browser loaded synthetic fixtures, commands, checklist, focus and 375/768/1440px layouts.');
     console.log('Scope: Chromium engine in current CI runner, localhost only; real mobile/WhatsApp/Firebase not tested.');
