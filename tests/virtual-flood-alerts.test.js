@@ -40,6 +40,8 @@ test('missing, null, blank and invalid sensor measurements never become zero or 
   }
   assert.equal(level({ water: { levelCm: 0, status: 'UNKNOWN' } }), 'SAFE',
     'genuine sensor level zero is still a valid safe reading');
+  assert.equal(level({ water: { distanceCm: null, levelCm: null, status: 'SAFE' } }),
+    'UNKNOWN', 'backend SAFE without a sensor value must not imply verified safety');
   assert.equal(level(synthetic(16.5)), 'WARNING');
   assert.equal(level(synthetic(14)), 'DANGER');
 });
@@ -68,6 +70,13 @@ test('virtual WhatsApp receives state transitions, not duplicate or stale flood 
   assert.equal(sent.length, 2);
   assert.match(sent[1].text, /FLOODGUARD DANGER/);
   assert.equal(getState().level, 'DANGER');
+
+  const unverifiedSafe = synthetic(null, now - 1500);
+  unverifiedSafe.water.levelCm = null;
+  unverifiedSafe.water.status = 'SAFE';
+  await processLiveChange(sock, unverifiedSafe);
+  assert.equal(sent.length, 2, 'missing measurements cannot generate a false SAFE recovery');
+  assert.equal(getState().level, 'DANGER', 'preserve last confirmed danger until new measured data');
 
   const old = synthetic(21, now - 120000);
   assert.equal(isStale(old), true);

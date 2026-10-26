@@ -72,7 +72,10 @@ function level(live) {
   // Only fall back to the backend state when no trustworthy numeric reading
   // is available. This prevents stale status + fresh distance mismatches.
   const s = upper(live?.water?.status);
-  if (['SAFE', 'WARNING', 'DANGER'].includes(s)) return s;
+  // A server-side SAFE label without a numeric sensor measurement is not
+  // enough to assert a safe water level or announce recovery.
+  if (s === 'SAFE') return 'UNKNOWN';
+  if (['WARNING', 'DANGER'].includes(s)) return s;
   if (s === 'SENSOR_ERROR' || s === 'ERROR') return 'SENSOR_ERROR';
   return 'UNKNOWN';
 }
@@ -258,11 +261,17 @@ function eventKey(prefix, live, extra = '') {
 async function processLiveChange(sock, live) {
   if (!live) return;
 
-  const currentLevel = level(live);
+  let currentLevel = level(live);
   const currentGate = normalizeGate(live);
   const countdown = Number(live?.gate?.countdownSeconds);
   const stale = isStale(live);
   let state = getState();
+  // Preserve the previous confirmed danger/warning state if this update is
+  // missing its physical reading; only verified measurements clear it.
+  if (currentLevel === 'UNKNOWN' && waterLevelCm(live) === null &&
+      ['WARNING', 'DANGER'].includes(state.level)) {
+    currentLevel = state.level;
+  }
 
   // Never generate safety alerts from stale snapshots.
   // We still update heartbeat metadata so the bot remains observable.
