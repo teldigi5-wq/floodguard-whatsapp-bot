@@ -88,7 +88,9 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
   function prune(time) {
     const old = data.pending.length;
     data.pending = data.pending.filter(j => j.expiresAt > time && time - j.sourceAt < MAX_TTL_MS);
-    data.expired += old - data.pending.length;
+    const removed = old - data.pending.length;
+    data.expired += removed;
+    return removed;
   }
   function observe(o) {
     const t = now();
@@ -148,14 +150,17 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
     draining = true;
     const report = {attempted:0,accepted:0,failed:0,expired:0,removed:0,pending:0};
     try {
-      prune(now());
+      report.expired += prune(now());
       for (const job of [...data.pending]) {
         if (job.topic !== observation.topic) continue;
         if (job.sourceAt !== observation.sourceAt || job.phase !== observation.phase ||
           !authorizedRecipients.has(job.recipient) || job.expiresAt <= now() ||
           now() - job.sourceAt >= MAX_TTL_MS) {
           data.pending = data.pending.filter(j => j !== job);
-          report.removed++;
+          if (job.expiresAt <= now() || now() - job.sourceAt >= MAX_TTL_MS) {
+            data.expired++;
+            report.expired++;
+          } else report.removed++;
           save(filename, data);
           continue;
         }
