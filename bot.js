@@ -67,7 +67,16 @@ app.get('/qr', requireSetupAdmin, (_req, res) => {
 
 app.get('/health', (_req, res) => res.set('Cache-Control', 'no-store').json({ status: 'ok', service: 'FloodGuard WhatsApp Bot' }));
 
-app.listen(PORT, HOST, () => console.log(`FloodGuard administration listening on ${HOST}:${PORT}`));
+app.listen(PORT, HOST, error => {
+  if (error) {
+    // Express 5 delivers listen errors to this callback. Never report the
+    // admin server as healthy when its private listener failed to bind.
+    console.error('FloodGuard administration listener could not start:', error.code || 'LISTEN_ERROR');
+    process.exitCode = 1;
+    throw error;
+  }
+  console.log(`FloodGuard administration listening on ${HOST}:${PORT}`);
+});
 
 function startFirebase() {
   if (stream) return;
