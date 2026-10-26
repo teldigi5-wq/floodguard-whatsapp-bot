@@ -31,9 +31,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Audit production dependencies (high severity)
-        run: npm audit --omit=dev --audit-level=high
-
       - name: Syntax and source validation
         run: npm run check
 
@@ -51,3 +48,6 @@ jobs:
           test -f src/webUi.js
           test -f package.json
           echo "FloodGuard project structure verified."
+
+      - name: Audit production dependencies (high severity)
+        run: npm audit --omit=dev --audit-level=high
