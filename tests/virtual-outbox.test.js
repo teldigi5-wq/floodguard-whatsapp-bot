@@ -151,3 +151,13 @@ test('sends cannot run twice concurrently against the same process-local outbox'
   release();
   await pending;
 }));
+
+
+test('outbox remains disconnected from the production WhatsApp and Firebase entrypoints', () => {
+  const bot = fs.readFileSync(path.join(__dirname, '../bot.js'), 'utf8');
+  const logic = fs.readFileSync(path.join(__dirname, '../src/floodguard.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname, '../src/virtualOutbox.js'), 'utf8');
+  assert.doesNotMatch(bot, /virtualOutbox|createVirtualOutbox/);
+  assert.doesNotMatch(logic, /virtualOutbox|createVirtualOutbox/);
+  assert.doesNotMatch(source, /@whiskeysockets|firebase|fetch\(|start\(\)/i);
+});
