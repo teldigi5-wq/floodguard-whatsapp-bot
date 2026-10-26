@@ -51,14 +51,16 @@ function waterLevelCm(live) {
   // behind distanceCm, so derive the level from distance whenever available.
   const reportedDistance = live?.water?.distanceCm;
   const distance = sensorNumber(reportedDistance);
-  if (reportedDistance !== null && reportedDistance !== undefined &&
-      !(typeof reportedDistance === 'string' && !reportedDistance.trim())) {
+  if (live?.water != null && Object.hasOwn(live.water, 'distanceCm')) {
     // HC-SR04 out-of-range measurements are errors, not SAFE. Do not use a
     // potentially stale levelCm to hide a present but invalid air-gap reading.
     if (distance === null || distance <= 0 || distance > 400) return null;
     return Math.max(0, Math.min(WATER_SENSOR_TO_BOTTOM_CM, WATER_SENSOR_TO_BOTTOM_CM - distance));
   }
 
+  // Direct-only providers are supported, but an explicit invalid air-gap
+  // field or an error status must not be overwritten with stale level data.
+  if (['SENSOR_ERROR', 'ERROR'].includes(upper(live?.water?.status))) return null;
   const direct = sensorNumber(live?.water?.levelCm);
   if (direct !== null && direct >= 0 && direct <= WATER_SENSOR_TO_BOTTOM_CM) {
     return direct;
