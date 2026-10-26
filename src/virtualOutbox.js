@@ -219,6 +219,18 @@ function createVirtualOutbox({ dataDir, now = Date.now, exclusive = false }) {
     try {
       report.expired += prune(now());
       for (const job of [...data.pending]) {
+        // Observe() may supersede a queued warning while an earlier fake
+        // send is pending. Never use stale snapshot jobs after an await.
+        ensureOwner();
+        if (!data.pending.includes(job)) continue;
+        const mostRecent = data.observations[job.topic];
+        if (!mostRecent || mostRecent.sourceAt !== job.sourceAt ||
+            mostRecent.phase !== job.phase) {
+          data.pending = data.pending.filter(j => j !== job);
+          data.superseded++;
+          persist();
+          continue;
+        }
         if (job.topic !== observation.topic) continue;
         if (job.sourceAt !== observation.sourceAt || job.phase !== observation.phase ||
           !authorizedRecipients.has(job.recipient) || job.expiresAt <= now() ||
@@ -243,8 +255,10 @@ function createVirtualOutbox({ dataDir, now = Date.now, exclusive = false }) {
         let timedOut = false;
         try {
           await Promise.race([
-            Promise.resolve().then(() =>
-              send(job.recipient, job.text, { signal: controller.signal })),
+            // Invoke the approved synthetic sender immediately after the
+            // freshness/ownership checks. Deferring invocation to a microtask
+            // could let a newer SAFE snapshot arrive before an old DANGER send.
+            Promise.resolve(send(job.recipient, job.text, { signal: controller.signal })),
             new Promise((_, reject) => {
               timeout = setTimeout(() => {
                 timedOut = true;
@@ -287,6 +301,9 @@ function createVirtualOutbox({ dataDir, now = Date.now, exclusive = false }) {
   function close() {
     if (closed) return;
     ensureOwner();
+    // Releasing an exclusive owner during a suspended remote send permits
+    // a second worker to open the same queue and double-dispatch.
+    required(!draining, 'cannot close exclusive owner while drain is active');
     if (token) {
       try { fs.unlinkSync(ownerFile); }
       catch { throw new Error('Offline alert outbox: exclusive owner release failed'); }

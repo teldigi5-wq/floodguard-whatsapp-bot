@@ -14,6 +14,12 @@ This document describes an **isolated, offline-only** development component. `sr
 
 Run `npm test` to exercise it as part of the Node.js 22/24 CI suite. No credentials, Firebase database or physical devices are needed.
 
+## In-flight safety boundary
+
+The virtual drain checks exclusive ownership and the latest accepted field observation before continuing each queued recipient. If a newer SAFE observation supersedes DANGER during a slow synthetic send, already-dispatched work cannot be recalled, but **remaining queued recipients must not receive the old DANGER warning**. Dispatch begins immediately after the freshness check rather than yielding to another microtask first.
+
+An exclusive owner's `close()` refuses to release the lock while a drain is active. If ownership is lost during a slow send (for example, a manual operator removes the lock), the original worker fails before persisting further results or sending subsequent jobs. These are virtual safety gates, **not guarantees of actual delivery or cancellation once a remote send has begun**.
+
 ## Explicit limitations before live integration
 
 1. **Not production-wired.** Real flood alerts continue through the existing path. An operator must separately approve any real integration after additional CI and staged acceptance.
