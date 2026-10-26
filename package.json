@@ -8,7 +8,8 @@
     "check": "node --check bot.js && node --check src/firebase.js && node --check src/floodguard.js && node --check src/store.js && node --check src/webUi.js && node --check src/adminAccess.js",
     "test": "node --test tests/*.test.js",
     "start:demo": "node scripts/start-demo.js",
-    "doctor": "node scripts/doctor.js"
+    "doctor": "node scripts/doctor.js",
+    "test:coverage": "node --experimental-test-coverage --test tests/*.test.js"
   },
   "engines": {
     "node": ">=20.0.0"

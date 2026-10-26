@@ -41,6 +41,11 @@ jobs:
       - name: Verify private administration routes
         run: npm test
 
+      # Informational line/branch/function coverage for active JavaScript only.
+      # Do not conflate legacy TypeScript tests or live hardware with this report.
+      - name: Measure active Node.js test coverage
+        run: npm run test:coverage
+
       - name: Verify required project files
         shell: bash
         run: |
