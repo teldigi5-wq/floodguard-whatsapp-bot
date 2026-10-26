@@ -81,19 +81,68 @@ function save(filename, data) {
   }
 }
 
-function createVirtualOutbox({ dataDir, now = Date.now }) {
+function createVirtualOutbox({ dataDir, now = Date.now, exclusive = false }) {
   required(typeof dataDir === 'string' && dataDir.length > 0, 'private data directory required');
   required(typeof now === 'function', 'clock function required');
+  required(typeof exclusive === 'boolean', 'invalid exclusive-owner setting');
   fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const filename = path.join(dataDir, FILE);
-  const data = load(filename);
+  const ownerFile = path.join(dataDir, 'alert-outbox-v1.owner');
+  const token = exclusive ? randomUUID() : null;
+  let closed = false;
+
+  // Optional cross-process fence. Creation is atomic; a crash leaves the
+  // private owner file, and a new owner must NOT steal it automatically.
+  if (token) {
+    let created = false;
+    try {
+      const fd = fs.openSync(ownerFile, 'wx', 0o600);
+      created = true;
+      try {
+        fs.writeFileSync(fd, token);
+        fs.fsyncSync(fd);
+      } finally {
+        fs.closeSync(fd);
+      }
+    } catch {
+      if (created) {
+        try { fs.unlinkSync(ownerFile); } catch {}
+      }
+      throw new Error('Offline alert outbox: exclusive owner is locked or unavailable');
+    }
+  } else required(!fs.existsSync(ownerFile), 'exclusive owner is locked');
+
+  function ensureOwner() {
+    required(!closed, 'owner already closed');
+    if (token) {
+      let current;
+      try { current = fs.readFileSync(ownerFile, 'utf8'); }
+      catch { throw new Error('Offline alert outbox: exclusive owner lost'); }
+      required(current === token, 'exclusive owner lost');
+    } else required(!fs.existsSync(ownerFile), 'exclusive owner is locked');
+  }
+  let data;
+  try { data = load(filename); }
+  catch (error) {
+    // Release only the lock created by this constructor when startup fails.
+    if (token) {
+      try { if (fs.readFileSync(ownerFile, 'utf8') === token) fs.unlinkSync(ownerFile); }
+      catch {}
+    }
+    throw error;
+  }
+  function persist() {
+    ensureOwner();
+    save(filename, data);
+  }
+
   // A process can die after a remote send was accepted, but before local
   // acknowledgement was committed. Do NOT replay in-flight attempts.
   const uncertainFromCrash = data.pending.filter(j => j.inFlight === true).length;
   if (uncertainFromCrash) {
     data.pending = data.pending.filter(j => j.inFlight !== true);
     data.ambiguous += uncertainFromCrash;
-    save(filename, data);
+    persist();
   }
   const verifiedThisProcess = new Map();
   let draining = false;
@@ -106,6 +155,7 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
     return removed;
   }
   function observe(o) {
+    ensureOwner();
     const t = now();
     validateObservation(o, t);
     const previous = data.observations[o.topic];
@@ -119,10 +169,11 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
     data.pending = data.pending.filter(j => j.topic !== o.topic ||
       (j.sourceAt === o.sourceAt && j.phase === o.phase));
     data.superseded += before - data.pending.length;
-    save(filename, data);
+    persist();
     return true;
   }
   function enqueue({ key, topic, sourceAt, phase, recipients, text, ttlMs = 7000 }) {
+    ensureOwner();
     required(typeof key === 'string' && /^[A-Za-z0-9:_-]{1,100}$/.test(key), 'invalid event key');
     required(typeof text === 'string' && text.length > 0 && text.length <= 1600,
       'message outside length limits');
@@ -147,10 +198,11 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
       expiresAt,attempts:0,nextAttemptAt:now(),inFlight:false});
     data.recentKeys.push(key);
     if (data.recentKeys.length > MAX_RECENT_KEYS) data.recentKeys.splice(0, data.recentKeys.length - MAX_RECENT_KEYS);
-    save(filename, data);
+    persist();
     return true;
   }
   async function drain({ observation, authorizedRecipients, send, sendTimeoutMs = 3000 }) {
+    ensureOwner();
     required(!draining, 'concurrent outbox drains are refused');
     required(Number.isSafeInteger(sendTimeoutMs) && sendTimeoutMs >= 1 &&
       sendTimeoutMs <= 5000, 'bounded send timeout must be 1-5000 milliseconds');
@@ -176,7 +228,7 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
             data.expired++;
             report.expired++;
           } else report.removed++;
-          save(filename, data);
+          persist();
           continue;
         }
         if (now() < job.nextAttemptAt) continue;
@@ -184,7 +236,7 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
         // Persist in-flight state BEFORE invoking an untrusted sender.
         // Restart quarantines it, avoiding automatic ambiguous replay.
         job.inFlight = true;
-        save(filename, data);
+        persist();
         report.attempted++;
         const controller = new AbortController();
         let timeout;
@@ -221,16 +273,26 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
         } finally {
           clearTimeout(timeout);
         }
-        save(filename, data);
+        persist();
       }
       report.pending = data.pending.length;
       return report;
     } finally { draining = false; }
   }
   function summary() {
+    ensureOwner();
     const { failedAttempts, exhausted, expired, superseded, ambiguous, pending } = data;
     return { pending: pending.length, failedAttempts, exhausted, expired, superseded, ambiguous };
   }
-  return Object.freeze({ observe, enqueue, drain, summary });
+  function close() {
+    if (closed) return;
+    ensureOwner();
+    if (token) {
+      try { fs.unlinkSync(ownerFile); }
+      catch { throw new Error('Offline alert outbox: exclusive owner release failed'); }
+    }
+    closed = true;
+  }
+  return Object.freeze({ observe, enqueue, drain, summary, close });
 }
 module.exports = { createVirtualOutbox };
