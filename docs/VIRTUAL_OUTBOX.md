@@ -19,10 +19,13 @@ Run `npm test` to exercise it as part of the Node.js 22/24 CI suite. No credenti
 1. **Not production-wired.** Real flood alerts continue through the existing path. An operator must separately approve any real integration after additional CI and staged acceptance.
 2. **No exactly-once or guaranteed delivery.** A crash after remote acceptance but before local acknowledgement can cause a duplicate retry. Promise resolution is not evidence a human received the message.
 3. **Single-process only.** The virtual core protects against concurrent drains in one process but has no cross-process lock. Shared EC2/PC multi-worker use must be designed and tested before integration.
-4. **No remote send timeout** or source authenticity mechanism in the core. It trusts the caller to provide a validated, fresh field observation. A hung send and a forged upstream state require separate safeguards.
+4. **Synthetic remote-send timeout and quarantine:** Each fake send has a bounded wait (default 3 seconds; 1–5000 ms supported). Timed-out attempts are durably marked **ambiguous** and removed from automatic retry, even if the original Promise later resolves. The caller receives a best-effort `AbortSignal`, not a guarantee of network cancellation. An in-flight job found on restart is also quarantined. The core still does **not** authenticate the incoming field observation; upstream integrity is a separate requirement.
 5. **No power-loss durability certification.** File sync and rename reduce partial-file risk but cannot prove behavior under all filesystem or sudden-power-off conditions.
 6. **Private identifiers stored locally.** Pending jobs include recipient addresses and text as plaintext in a `0600` local file, not encrypted. Never commit, upload, or display outbox files; protect disk, backups and operator permissions.
 7. **Capacity refusal is explicit, not a delivery success.** A full queue throws without discarding existing jobs, requiring operator observation and a separate failure policy.
+
+
+**Known trade-off:** Quarantining uncertain sends reduces duplicate-message risk, but can also mean a warning was never delivered. It requires operator oversight and cannot establish reliable alert delivery. Definite synthetic callback rejections remain bounded retryable failures; a real adapter must separately classify ambiguous remote errors before approval. The module remains disconnected from live WhatsApp.
 
 Next review: decide whether to add a source-verified, bounded orchestrator that integrates this core with alert transitions while preserving sender privacy, safe expiry, de-duplication and restart behavior. Add real-time stress simulations and negative-path logging/rollback tests before making any live change.
 
