@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
-const { createAdminGuard, validToken } = require('../src/adminAccess');
+const { createAdminGuard, validToken, resolveAdminHost } = require('../src/adminAccess');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { once } = require('node:events');
@@ -30,6 +30,25 @@ async function withServer(token, fn) {
     await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));
   }
 }
+test('admin listener fails closed for wildcard and public network bindings', () => {
+  for (const [value, expected] of [
+    [undefined, '127.0.0.1'],
+    [null, '127.0.0.1'],
+    ['', '127.0.0.1'],
+    ['127.0.0.1', '127.0.0.1'],
+    ['::1', '::1'],
+    ['localhost', 'localhost']
+  ]) {
+    assert.equal(resolveAdminHost(value), expected);
+  }
+  for (const value of [
+    '0.0.0.0', '::', '192.168.1.20', '203.0.113.4',
+    'example.com', '127.0.0.1.evil.test', '127.0.0.2',
+    '[::1]', '127.0.0.1\\n'
+  ]) {
+    assert.throws(() => resolveAdminHost(value), /Refusing non-loopback/);
+  }
+});
 test('token policy rejects missing, short and unsafe configured values',()=>{
   for(const v of [undefined,'', 'not-long-enough', 'x'.repeat(40)+'\n','x'.repeat(40)+' ']){
     assert.equal(validToken(v),false);
@@ -89,6 +108,7 @@ test('actual bot entrypoint guards every admin route, health is sanitized',()=>{
     assert.ok(source.includes("app.get('"+route+"', requireSetupAdmin,"),route+' not guarded');
   }
   assert.ok(source.includes("const requireSetupAdmin = createAdminGuard();"));
+  assert.ok(source.includes("const HOST = resolveAdminHost(process.env.HOST);"));
   const healthBlock=source.slice(source.indexOf("app.get('/health'"),source.indexOf("app.listen("));
   assert.ok(!healthBlock.includes('whatsapp: wa'));
   assert.ok(!healthBlock.includes('firebase: fb'));
