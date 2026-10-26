@@ -14,7 +14,7 @@ const { DATA_PATH } = require('./src/store');
 const { getLive, streamLive } = require('./src/firebase');
 const { commandReply, processLiveChange } = require('./src/floodguard');
 const { renderPage } = require('./src/webUi');
-const { createAdminGuard } = require('./src/adminAccess');
+const { createAdminGuard, resolveAdminHost } = require('./src/adminAccess');
 
 fs.mkdirSync(DATA_PATH, { recursive: true });
 const AUTH = path.join(DATA_PATH, 'auth');
@@ -23,7 +23,7 @@ fs.mkdirSync(AUTH, { recursive: true });
 const PORT = Number(process.env.PORT || 8080);
 const app = express();
 const requireSetupAdmin = createAdminGuard();
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = resolveAdminHost(process.env.HOST);
 
 let qr = null;
 let qrGeneratedAt = 0;
