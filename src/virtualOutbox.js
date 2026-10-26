@@ -255,8 +255,10 @@ function createVirtualOutbox({ dataDir, now = Date.now, exclusive = false }) {
         let timedOut = false;
         try {
           await Promise.race([
-            Promise.resolve().then(() =>
-              send(job.recipient, job.text, { signal: controller.signal })),
+            // Invoke the approved synthetic sender immediately after the
+            // freshness/ownership checks. Deferring invocation to a microtask
+            // could let a newer SAFE snapshot arrive before an old DANGER send.
+            Promise.resolve(send(job.recipient, job.text, { signal: controller.signal })),
             new Promise((_, reject) => {
               timeout = setTimeout(() => {
                 timedOut = true;
