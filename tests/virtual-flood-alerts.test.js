@@ -131,3 +131,15 @@ test('future or invalid telemetry timestamps cannot bypass freshness gate', asyn
   await processLiveChange({sendMessage: async (_to, msg) => sent.push(msg)}, tooFuture);
   assert.equal(sent.length, 0, 'future-dated danger must not broadcast an unverified alert');
 });
+
+
+test('WhatsApp replies redact private Firebase transport failure details', async () => {
+  const internal = 'https://example.invalid/private.json?auth=synthetic-secret-98765';
+  const reply = await commandReply('synthetic-test-contact', 'stats', async () => {
+    throw new Error(internal);
+  });
+  assert.match(reply, /FIREBASE NOT AVAILABLE/);
+  assert.match(reply, /No sensor value has been fabricated/);
+  assert.ok(!reply.includes('synthetic-secret'));
+  assert.ok(!reply.includes('example.invalid'));
+});
