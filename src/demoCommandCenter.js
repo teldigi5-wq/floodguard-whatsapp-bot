@@ -146,7 +146,7 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
   <div class="diagnostic"><strong>Session</strong><span class="diagnostic-status">NOT LINKED</span><span class="diagnostic-detail">WhatsApp login is intentionally disabled.</span></div>
   <div class="diagnostic"><strong>Demo listener</strong><span class="diagnostic-status">LOOPBACK</span><span class="diagnostic-detail">Authenticated localhost-only preview. Never expose the listener to the public network.</span></div>
   <div class="diagnostic"><strong>Installed hardware</strong><span class="diagnostic-status">UNCHANGED</span><span class="diagnostic-detail">Arduino and ESP8266 firmware stays exactly as flashed.</span></div>
-  <div id="hostingChecks" role="status" aria-live="polite" class="help">Checking local hosting configuration…</div><p class="help">Windows: run <code>npm run doctor</code> for a separate preflight. Stop this local demo with Ctrl+C. EC2 is optional later; follow the README TLS, firewall and secret-management guidance before any approved deployment. Do not pair WhatsApp or start a live process during this stage.</p>
+  <div id="hostingChecks" role="status" aria-live="polite" class="help">Checking local hosting configuration…</div><p class="help">Windows: run <code>npm run check</code> and <code>npm test</code> to verify code locally; these are not live-host preflight checks. Stop this local demo with Ctrl+C. EC2 is optional later; follow the README TLS, firewall and secret-management guidance before any approved deployment. Do not pair WhatsApp or start a live process during this stage.</p>
  </div>
 </section>
 <section class="panel" aria-labelledby="acceptanceTitle">
@@ -279,7 +279,7 @@ select{width:100%;max-width:350px;border:1px solid #4c788b;border-radius:11px;pa
         ['Local listener','LOOPBACK ONLY','Protected browser requests on a local port; no remote exposure'],
         ['Storage directory',hostInfo.storageAccessible?'ACCESSIBLE':'NOT VERIFIED','Directory access flag only; no session files or credentials are opened in demo'],
         ['Real connections','DISABLED','WhatsApp unlinked, Firebase disconnected and physical hardware untouched'],
-        ['Preflight','SEPARATE CHECK','Run npm run doctor locally before an explicitly approved live process']
+        ['Preflight','SEPARATE CHECK','Live-host preflight is not run by this demo; verify deployment requirements separately']
       ];
       for(const [name,value,detail] of items){
         const row=el('div','diagnostic');
