@@ -116,6 +116,9 @@ function streamLive() {
   let connected = false;
   let flushTimer = null;
   const controllers = new Set();
+  // Every child may be sleeping through exponential reconnect backoff.
+  // Stop must release those waits immediately, not retain 1–30 s timers.
+  const retryWaiters = new Map();
   const values = Object.create(null);
   const received = new Set();
 
@@ -133,6 +136,17 @@ function streamLive() {
       flushTimer = null;
       publish();
     }, 180);
+  }
+
+  function waitForRetry(ms) {
+    if (stopped) return Promise.resolve();
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        retryWaiters.delete(timer);
+        resolve();
+      }, ms);
+      retryWaiters.set(timer, resolve);
+    });
   }
 
   async function watch(key, child) {
@@ -206,7 +220,7 @@ function streamLive() {
         connected = false;
       }
       if (!stopped) {
-        await new Promise(resolve => setTimeout(resolve, retry));
+        await waitForRetry(retry);
         retry = Math.min(retry * 2, 30000);
       }
     }
@@ -220,6 +234,11 @@ function streamLive() {
   emitter.stop = () => {
     stopped = true;
     if (flushTimer) clearTimeout(flushTimer);
+    for (const [timer, finish] of retryWaiters) {
+      clearTimeout(timer);
+      finish();
+    }
+    retryWaiters.clear();
     for (const controller of controllers) controller.abort();
   };
   return emitter;
