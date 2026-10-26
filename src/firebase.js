@@ -34,10 +34,25 @@ async function getChild(child) {
   });
   if (!response.ok) throw new Error('Firebase public telemetry HTTP ' + response.status);
   const contentLength = Number(response.headers?.get('content-length') || 0);
-  if (contentLength > MAX_SNAPSHOT_BYTES) throw new Error('Firebase telemetry response too large');
-  const text = await response.text();
-  if (Buffer.byteLength(text, 'utf8') > MAX_SNAPSHOT_BYTES) throw new Error('Firebase telemetry response too large');
-  return JSON.parse(text);
+  if (Number.isFinite(contentLength) && contentLength > MAX_SNAPSHOT_BYTES)
+    throw new Error('Firebase telemetry response too large');
+  const reader = response.body?.getReader?.();
+  if (!reader) throw new Error('Firebase telemetry response missing body');
+  const parts = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_SNAPSHOT_BYTES) throw new Error('Firebase telemetry response too large');
+      parts.push(Buffer.from(value));
+    }
+  } finally {
+    try { await reader.cancel(); } catch (_) {}
+    reader.releaseLock();
+  }
+  return JSON.parse(Buffer.concat(parts, total).toString('utf8'));
 }
 
 function assemble(values) {
