@@ -353,7 +353,7 @@ async function processLiveChangeSerial(sock, live) {
   // confirmation that a remote device received earlier messages.
   let failedSends = 0;
   const sendAlert = async text => {
-    failedSends += await sendAlert( text);
+    failedSends += await sendAll(sock, text);
   };
 
   const previousLevel = state.level || 'UNKNOWN';
