@@ -105,6 +105,16 @@ The configured CI includes synthetic tests on both Node.js versions, syntax/sour
 
 These are **synthetic test inputs**, not measured real-world sensor accuracy, latency or delivery statistics.
 
+## Read-only deployment preflight
+
+Before an explicitly approved **real** bot setup, run `npm run doctor`. This local check reads configuration and filesystem metadata without contacting Firebase, WhatsApp, EC2 or Arduino hardware, and without exposing token values or private paths. It verifies patched Node.js 22/24, local admin binding, the token's basic shape, Firebase URL syntax, data-directory accessibility and stale-data configuration.
+
+- A `PASS` means **configuration syntax only** was accepted; it does **not** certify a connected account, a safe production deployment or durable EC2 storage.
+- A `WARN` means manual follow-up may be required, for example a missing paired session.
+- A `FAIL` blocks setup and must be resolved without weakening the checks.
+
+The separate `npm run start:demo` path remains synthetic only; preflight does not grant approval to activate the real service.
+
 ## Configuration and operator setup
 
 The application reads environment settings. Example placeholders (not working secrets):
