@@ -36,6 +36,12 @@ The repository also contains `tests/format.test.ts` using Vitest and a historica
 - Do **not** claim the historical HTTP/webhook code is protected by the live service's administration tests.
 - Reconcile, properly validate, or archive the legacy TypeScript subsystem only under a separately reviewed PR if it is genuinely required.
 
+## Delivery-failure behavior (not a retry guarantee)
+
+Synthetic partial-send tests exercise one accepted fake WhatsApp send and one rejected fake send. The alert processor stores aggregate `alertSendFailureCount`, `lastDeliveryFailureAt` and a sticky `deliveryDegraded` indicator in the protected local `state.json`, without recording recipient identifiers or transport exceptions. Logs emit a redacted failure notice.
+
+**Important limitations:** A successful `sock.sendMessage` call is not proof that the recipient actually received or read the message. A failed call is **not currently retried** by a durable outbox; the current implementation may advance the alert transition even when some sends fail. The counters record attempted failures, not missed real-world messages. Correct bounded retry, deduplication after process restarts, expiry of obsolete hazard warnings, and delivery acknowledgement policies remain issue #35 work. Operators must not claim reliable notification delivery based on these tests.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
