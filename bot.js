@@ -90,8 +90,8 @@ function startFirebase() {
 
   stream.on('error', e => {
     fb = 'RECONNECTING';
-    lastError = `Firebase: ${e.message}`;
-    console.error('Firebase:', e.message);
+    lastError = 'Firebase stream unavailable; reconnecting';
+    console.error('FloodGuard Firebase stream failure (details redacted)');
   });
 
   // Always use the CURRENT WhatsApp socket. The bot may reconnect and create
@@ -99,8 +99,8 @@ function startFirebase() {
   stream.on('live', live => {
     if (!activeSock || wa !== 'CONNECTED') return;
     processLiveChange(activeSock, live).catch(error => {
-      lastError = `Alert processing: ${error.message}`;
-      console.error(error);
+      lastError = 'Alert processing failed; local review required';
+      console.error('FloodGuard alert processing failed (details redacted)');
     });
   });
 }
@@ -143,8 +143,8 @@ async function start() {
         console.log(`QR ready (v${qrVersion}): http://localhost:${PORT}`);
       } catch (error) {
         qr = null;
-        lastError = `QR generation: ${error.message}`;
-        console.error(lastError);
+        lastError = 'WhatsApp QR generation failed';
+        console.error('FloodGuard QR generation failed (details redacted)');
       }
     }
 
@@ -155,7 +155,7 @@ async function start() {
       qrGeneratedAt = 0;
       num = sock.user?.id || null;
       lastError = null;
-      console.log('WhatsApp connected', num);
+      console.log('WhatsApp connected (account identifier withheld)');
       startFirebase();
     }
 
@@ -181,7 +181,7 @@ async function start() {
           fs.rmSync(AUTH, { recursive: true, force: true });
           fs.mkdirSync(AUTH, { recursive: true });
         } catch (error) {
-          console.error('Could not reset WhatsApp auth:', error);
+          console.error('WhatsApp authentication reset failed (details redacted)');
         }
         setTimeout(start, 1800);
       }
@@ -203,7 +203,7 @@ async function start() {
         const reply = await commandReply(jid, text, getLive);
         await sock.sendMessage(jid, { text: reply }, { quoted: m });
       } catch (e) {
-        console.error('Command error:', e);
+        console.error('FloodGuard command processing failed (details redacted)');
         await sock.sendMessage(
           jid,
           { text: '⚠️ FloodGuard bot could not process that request right now.' },
@@ -215,6 +215,6 @@ async function start() {
 }
 
 start().catch(error => {
-  lastError = `Startup: ${error.message}`;
-  console.error(error);
+  lastError = 'WhatsApp service startup failed';
+  console.error('FloodGuard startup failed (details redacted)');
 });
