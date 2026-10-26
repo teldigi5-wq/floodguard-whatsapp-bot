@@ -31,7 +31,7 @@ function validateObservation(o, now) {
 }
 function empty() {
   return { version: 1, observations: {}, pending: [], recentKeys: [],
-    failedAttempts: 0, exhausted: 0, expired: 0, superseded: 0 };
+    failedAttempts: 0, exhausted: 0, expired: 0, superseded: 0, ambiguous: 0 };
 }
 function load(filename) {
   let raw;
@@ -58,8 +58,13 @@ function load(filename) {
     Number.isSafeInteger(j.sourceAt) && Number.isSafeInteger(j.expiresAt) &&
     Number.isSafeInteger(j.attempts) && j.attempts >= 0 && j.attempts < MAX_ATTEMPTS &&
     Number.isSafeInteger(j.nextAttemptAt) && j.expiresAt > j.sourceAt &&
-    j.expiresAt <= j.sourceAt + MAX_TTL_MS), 'invalid stored job');
+    j.expiresAt <= j.sourceAt + MAX_TTL_MS &&
+    (j.inFlight === undefined || typeof j.inFlight === 'boolean')), 'invalid stored job');
   required(data.recentKeys.every(k => typeof k === 'string' && k.length <= 100), 'invalid stored dedupe key');
+  required(data.ambiguous === undefined ||
+    (Number.isSafeInteger(data.ambiguous) && data.ambiguous >= 0),
+    'invalid ambiguous delivery counter');
+  data.ambiguous ??= 0; // Supports valid stores written before this stage.
   return data;
 }
 function save(filename, data) {
@@ -82,6 +87,14 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
   fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   const filename = path.join(dataDir, FILE);
   const data = load(filename);
+  // A process can die after a remote send was accepted, but before local
+  // acknowledgement was committed. Do NOT replay in-flight attempts.
+  const uncertainFromCrash = data.pending.filter(j => j.inFlight === true).length;
+  if (uncertainFromCrash) {
+    data.pending = data.pending.filter(j => j.inFlight !== true);
+    data.ambiguous += uncertainFromCrash;
+    save(filename, data);
+  }
   const verifiedThisProcess = new Map();
   let draining = false;
 
@@ -131,14 +144,16 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
     const expiresAt = Math.min(now() + ttlMs, sourceAt + MAX_TTL_MS);
     required(expiresAt > now(), 'alert already stale');
     for (const recipient of recipients) data.pending.push({key,topic,sourceAt,phase,recipient,text,
-      expiresAt,attempts:0,nextAttemptAt:now()});
+      expiresAt,attempts:0,nextAttemptAt:now(),inFlight:false});
     data.recentKeys.push(key);
     if (data.recentKeys.length > MAX_RECENT_KEYS) data.recentKeys.splice(0, data.recentKeys.length - MAX_RECENT_KEYS);
     save(filename, data);
     return true;
   }
-  async function drain({ observation, authorizedRecipients, send }) {
+  async function drain({ observation, authorizedRecipients, send, sendTimeoutMs = 3000 }) {
     required(!draining, 'concurrent outbox drains are refused');
+    required(Number.isSafeInteger(sendTimeoutMs) && sendTimeoutMs >= 1 &&
+      sendTimeoutMs <= 5000, 'bounded send timeout must be 1-5000 milliseconds');
     required(typeof send === 'function', 'synthetic send callback required');
     required(authorizedRecipients instanceof Set && authorizedRecipients.size <= 10000,
       'current subscriber allowlist required');
@@ -148,7 +163,7 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
       verifiedThisProcess.get(observation.topic) === observation.sourceAt + ':' + observation.phase,
       'newly verified observation required to drain');
     draining = true;
-    const report = {attempted:0,accepted:0,failed:0,expired:0,removed:0,pending:0};
+    const report = {attempted:0,accepted:0,failed:0,ambiguous:0,expired:0,removed:0,pending:0};
     try {
       report.expired += prune(now());
       for (const job of [...data.pending]) {
@@ -166,21 +181,45 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
         }
         if (now() < job.nextAttemptAt) continue;
         job.attempts++;
-        // Persist attempt BEFORE invoking an untrusted remote send. A crash
-        // after acceptance but before removal may still allow duplicates.
+        // Persist in-flight state BEFORE invoking an untrusted sender.
+        // Restart quarantines it, avoiding automatic ambiguous replay.
+        job.inFlight = true;
         save(filename, data);
         report.attempted++;
+        const controller = new AbortController();
+        let timeout;
+        let timedOut = false;
         try {
-          await send(job.recipient, job.text);
+          await Promise.race([
+            Promise.resolve().then(() =>
+              send(job.recipient, job.text, { signal: controller.signal })),
+            new Promise((_, reject) => {
+              timeout = setTimeout(() => {
+                timedOut = true;
+                controller.abort(); // Best-effort: remote delivery may already have occurred.
+                reject(new Error('Synthetic sender timed out'));
+              }, sendTimeoutMs);
+            })
+          ]);
           data.pending = data.pending.filter(j => j !== job);
           report.accepted++;
         } catch {
-          data.failedAttempts++;
-          report.failed++;
-          if (job.attempts >= MAX_ATTEMPTS) {
+          if (timedOut) {
+            // Outcome unknown. Quarantine, do not automatically retry.
             data.pending = data.pending.filter(j => j !== job);
-            data.exhausted++;
-          } else job.nextAttemptAt = now() + Math.min(1000 * 2 ** (job.attempts-1), 5000);
+            data.ambiguous++;
+            report.ambiguous++;
+          } else {
+            data.failedAttempts++;
+            report.failed++;
+            job.inFlight = false;
+            if (job.attempts >= MAX_ATTEMPTS) {
+              data.pending = data.pending.filter(j => j !== job);
+              data.exhausted++;
+            } else job.nextAttemptAt = now() + Math.min(1000 * 2 ** (job.attempts-1), 5000);
+          }
+        } finally {
+          clearTimeout(timeout);
         }
         save(filename, data);
       }
@@ -189,8 +228,8 @@ function createVirtualOutbox({ dataDir, now = Date.now }) {
     } finally { draining = false; }
   }
   function summary() {
-    const { failedAttempts, exhausted, expired, superseded, pending } = data;
-    return { pending: pending.length, failedAttempts, exhausted, expired, superseded };
+    const { failedAttempts, exhausted, expired, superseded, ambiguous, pending } = data;
+    return { pending: pending.length, failedAttempts, exhausted, expired, superseded, ambiguous };
   }
   return Object.freeze({ observe, enqueue, drain, summary });
 }
