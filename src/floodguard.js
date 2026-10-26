@@ -20,9 +20,10 @@ function normalizeDevice(x) {
 }
 
 function normalizeGate(live) {
-  const angle = Number(live?.gate?.angle);
-  const countdown = Number(live?.gate?.countdownSeconds);
-  let raw = upper(live?.gate?.status, 'CLOSED');
+  // Do not coerce null or blank telemetry into physical position zero.
+  const angle = sensorNumber(live?.gate?.angle);
+  const countdown = sensorNumber(live?.gate?.countdownSeconds);
+  let raw = upper(live?.gate?.status);
 
   if (raw === 'OPENING_WARNING') raw = 'COUNTDOWN';
   if (Number.isFinite(countdown) && countdown > 0) return 'COUNTDOWN';
@@ -48,14 +49,19 @@ function waterLevelCm(live) {
   // The physical HC-SR04 air gap is the authoritative live measurement.
   // Firebase multi-location PATCHes can briefly leave levelCm/status one event
   // behind distanceCm, so derive the level from distance whenever available.
-  const distance = sensorNumber(live?.water?.distanceCm);
-  if (distance !== null && distance > 0) {
+  const reportedDistance = live?.water?.distanceCm;
+  const distance = sensorNumber(reportedDistance);
+  if (reportedDistance !== null && reportedDistance !== undefined &&
+      !(typeof reportedDistance === 'string' && !reportedDistance.trim())) {
+    // HC-SR04 out-of-range measurements are errors, not SAFE. Do not use a
+    // potentially stale levelCm to hide a present but invalid air-gap reading.
+    if (distance === null || distance <= 0 || distance > 400) return null;
     return Math.max(0, Math.min(WATER_SENSOR_TO_BOTTOM_CM, WATER_SENSOR_TO_BOTTOM_CM - distance));
   }
 
   const direct = sensorNumber(live?.water?.levelCm);
-  if (direct !== null && direct >= 0) {
-    return Math.max(0, Math.min(WATER_SENSOR_TO_BOTTOM_CM, direct));
+  if (direct !== null && direct >= 0 && direct <= WATER_SENSOR_TO_BOTTOM_CM) {
+    return direct;
   }
 
   return null;
@@ -86,8 +92,12 @@ function risk(live) {
 }
 
 function isStale(live) {
-  const ts = Number(live?.system?.lastUpdate);
-  return Number.isFinite(ts) && ts > 0 ? Date.now() - ts > STALE_AFTER_MS : true;
+  // Treat implausibly future-dated telemetry as untrusted, not permanently
+  // "LIVE". A small 5-second sender/receiver clock skew remains tolerated.
+  const ts = sensorNumber(live?.system?.lastUpdate);
+  if (ts === null || ts <= 0) return true;
+  const age = Date.now() - ts;
+  return age > STALE_AFTER_MS || age < -5000;
 }
 
 function ageText(live) {
