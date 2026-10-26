@@ -108,3 +108,41 @@ test('unbounded, negative and noninteger remote send timeouts fail closed', () =
     assert.equal(outbox.summary().pending,1);
   })
 );
+
+
+test('a restarted process quarantines a persisted in-flight attempt before any send', () =>
+  fixture(async ({outbox,obs,dir,now}) => {
+    outbox.enqueue(queue(obs));
+    const filename=path.join(dir, 'alert-outbox-v1.json');
+    const stored=JSON.parse(fs.readFileSync(filename,'utf8'));
+    stored.pending[0].attempts=1;
+    stored.pending[0].inFlight=true; // synthetic crash after remote attempt started
+    fs.writeFileSync(filename,JSON.stringify(stored));
+    const restarted=createVirtualOutbox({dataDir:dir,now});
+    assert.equal(restarted.summary().pending,0);
+    assert.equal(restarted.summary().ambiguous,1);
+    restarted.observe(obs);
+    let sends=0;
+    const report=await restarted.drain({observation:obs,authorizedRecipients:new Set([A]),
+      send:async()=>{sends++}});
+    assert.equal(report.attempted,0);
+    assert.equal(sends,0);
+    const secondRestart=createVirtualOutbox({dataDir:dir,now});
+    assert.equal(secondRestart.summary().ambiguous,1,
+      'crash quarantine must only count an ambiguous job once');
+  })
+);
+
+test('valid older outbox records without ambiguous counter remain readable', () =>
+  fixture(async ({outbox,obs,dir,now}) => {
+    outbox.enqueue(queue(obs));
+    const filename=path.join(dir,'alert-outbox-v1.json');
+    const stored=JSON.parse(fs.readFileSync(filename,'utf8'));
+    delete stored.ambiguous;
+    delete stored.pending[0].inFlight;
+    fs.writeFileSync(filename,JSON.stringify(stored));
+    const reopened=createVirtualOutbox({dataDir:dir,now});
+    assert.equal(reopened.summary().pending,1);
+    assert.equal(reopened.summary().ambiguous,0);
+  })
+);
