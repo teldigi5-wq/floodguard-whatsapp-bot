@@ -21,6 +21,16 @@
 - The operator checklist is temporary, local presentation state. It is **not** authorization to deploy, turn on physical hardware or connect WhatsApp.
 - If the demo cannot start, verify the private token and local port. Do not work around localhost restrictions by setting a public listener address.
 
+## Automated real-browser verification (CI only)
+
+The new `FloodGuard Offline Browser E2E` GitHub Actions workflow uses the Chrome binary provided by the Ubuntu 24.04 runner with patched Node.js 24.22.1. It records the exact browser version during each run. The workflow uses Node's built-in Chrome DevTools Protocol WebSocket, so it adds **no Puppeteer, Playwright, browser CDN or new npm dependency**. It starts an ephemeral authenticated demo bound strictly to `127.0.0.1`, uses a **synthetic-only** temporary admin token, and never starts `bot.js`.
+
+The browser test checks initial disconnected hosting diagnostics, eight fictional sensor cards, synthetic DANGER and STALE scenario changes, synthetic read-only chat replies, clear/reset controls, the temporary acceptance checklist, skip-link focus visibility, and page overflow/action visibility at **375px phone-width, 768px tablet-width, and 1440px desktop-width**. It also rejects any attempted HTTP(S) request outside the demo's localhost origin. The browser process and its temporary profile are closed and removed when the test finishes.
+
+To rerun in GitHub, open the `FloodGuard Offline Browser E2E` workflow and use **Run workflow** on a branch containing the test, or open a PR that changes relevant offline-demo files. `npm test` remains the separate Node.js unit/integration suite; it does **not** count these browser assertions toward Node's numbered test total.
+
+**Limitations:** This exercises the Chromium engine and a moving Chrome release present on the CI runner—not a pinned browser build, accessibility certification, VoiceOver/TalkBack, Safari/Firefox, or an actual mobile device. It provides a pragmatic automated browser smoke and layout check, not a full WCAG audit. It does not verify real service availability, WhatsApp delivery, network failure, Firebase RTDB permission rules, or the physical flood-warning system.
+
 ## Distinguish demo from real system
 
 | Capability | Offline demo | Real system |
