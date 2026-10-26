@@ -82,7 +82,8 @@ test('virtual WhatsApp receives state transitions, not duplicate or stale flood 
   assert.equal(isStale(old), true);
   await processLiveChange(sock, old);
   assert.equal(sent.length, 2, 'stale data must never announce recovery');
-  assert.equal(getState().dataStale, true);
+  assert.equal(getState().dataStale, false,
+    'an older stale callback must not invalidate the latest confirmed reading');
 
   await processLiveChange(sock, synthetic(21, now - 1000));
   assert.equal(sent.length, 3);

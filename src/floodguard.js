@@ -309,7 +309,13 @@ async function processLiveChangeSerial(sock, live) {
   const currentGate = normalizeGate(live);
   const countdown = Number(live?.gate?.countdownSeconds);
   const stale = isStale(live);
+  const sourceAt = fieldTimeMs(live);
   let state = getState();
+  // SSE children can reconnect and deliver valid observations out of order.
+  // Serialize processing AND reject field timestamps older than the most
+  // recent persisted observation to prevent false SAFE recovery.
+  const lastSourceAt = Number.isFinite(state.lastSourceAt) ? state.lastSourceAt : 0;
+  if (sourceAt !== null && sourceAt < lastSourceAt) return;
   // Preserve the previous confirmed danger/warning state if this update is
   // missing its physical reading; only verified measurements clear it.
   if (currentLevel === 'UNKNOWN' && waterLevelCm(live) === null &&
@@ -320,7 +326,8 @@ async function processLiveChangeSerial(sock, live) {
   // Never generate safety alerts from stale snapshots.
   // We still update heartbeat metadata so the bot remains observable.
   if (stale) {
-    saveState({ ...state, lastSeenAt: Date.now(), dataStale: true });
+    saveState({ ...state, lastSourceAt: sourceAt ?? state.lastSourceAt,
+      lastSeenAt: Date.now(), dataStale: true });
     return;
   }
 
@@ -333,6 +340,7 @@ async function processLiveChangeSerial(sock, live) {
       procedureId: opening(live) ? `existing-${Number(live?.system?.lastUpdate) || Date.now()}` : null,
       sentCountdown: [],
       lastSeenAt: Date.now(),
+      lastSourceAt: sourceAt,
       dataStale: false
     });
     return;
@@ -406,6 +414,7 @@ async function processLiveChangeSerial(sock, live) {
     sentCountdown,
     lastEventKey,
     lastSeenAt: Date.now(),
+    lastSourceAt: sourceAt,
     dataStale: false
   });
 }
