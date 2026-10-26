@@ -157,5 +157,5 @@ test('real bot is not connected to the synthetic queue and queue has no remote i
   const bot=fs.readFileSync(path.join(__dirname,'../bot.js'),'utf8');
   const source=fs.readFileSync(path.join(__dirname,'../src/virtualTelemetryScheduler.js'),'utf8');
   assert.doesNotMatch(bot,/virtualTelemetryScheduler|createVirtualTelemetryScheduler/);
-  assert.doesNotMatch(source,/(@whiskeysockets|firebase|fetch\s*\(|sendMessage\s*\()/i);
+  assert.doesNotMatch(source,/(?:require\s*\(\s*['"](?:@whiskeysockets|firebase|https?|node:https?)|fetch\s*\(|sendMessage\s*\()/i);
 });
