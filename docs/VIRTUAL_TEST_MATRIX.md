@@ -42,6 +42,10 @@ Synthetic partial-send tests exercise one accepted fake WhatsApp send and one re
 
 **Important limitations:** A successful `sock.sendMessage` call is not proof that the recipient actually received or read the message. A failed call is **not currently retried** by a durable outbox; the current implementation may advance the alert transition even when some sends fail. The counters record attempted failures, not missed real-world messages. Correct bounded retry, deduplication after process restarts, expiry of obsolete hazard warnings, and delivery acknowledgement policies remain issue #35 work. Operators must not claim reliable notification delivery based on these tests.
 
+## Firebase SSE connection-lifecycle regression
+
+An offline-only synthetic test opens the exact allowlisted child streams and simulates an unexpected **clean EOF** after the first complete snapshot. A clean remote EOF is now classified as a stream outage and surfaced through the existing redacted error event, allowing the bot's current Firebase health listener to switch to `RECONNECTING`. A deliberate `stream.stop()` is not an outage. The checks do **not** connect to Firebase production, prove Firebase Emulator permissions, or establish an actual network reconnect success rate.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
