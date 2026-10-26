@@ -202,7 +202,8 @@ async function commandReply(jid, text, getLive) {
   try {
     live = await getLive();
   } catch (e) {
-    return `⚠️ *FIREBASE NOT AVAILABLE*\n\n${e.message}\n\nNo sensor value has been fabricated.`;
+    // Never send transport errors, private URLs or auth material to WhatsApp.
+    return '⚠️ *FIREBASE NOT AVAILABLE*\n\nTelemetry could not be retrieved. No sensor value has been fabricated.';
   }
 
   if (['stats', 'status'].includes(c)) return stats(live);
