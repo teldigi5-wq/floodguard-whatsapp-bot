@@ -93,19 +93,38 @@ function risk(live) {
   return ['LOW', 'MODERATE', 'HIGH', 'SEVERE', 'CRITICAL'].includes(r) ? r : 'UNKNOWN';
 }
 
+const EARLIEST_FIELD_TIME_MS = Date.UTC(2000, 0, 1);
+const MAX_FIELD_CLOCK_LEAD_MS = 5000;
+
+// Normalize documented timestamps without turning null, zero or implausible
+// future values into "LIVE" telemetry. Milliseconds and Unix seconds are
+// supported; ISO strings must include a timezone indicator.
+function fieldTimeMs(live, now = Date.now()) {
+  const value = live?.system?.lastUpdate;
+  let raw = null;
+  if (typeof value === 'number' && Number.isFinite(value)) raw = value;
+  else if (typeof value === 'string' && value.trim()) {
+    const str = value.trim();
+    if (/^[+-]?\d+(?:\.\d+)?$/.test(str)) raw = Number(str);
+    else if (/^\d{4}-\d\d-\d\dT.+(?:Z|[+-]\d\d:\d\d)$/i.test(str)) raw = Date.parse(str);
+  }
+  if (raw === null || !Number.isFinite(raw)) return null;
+  const ts = raw < 1e12 ? raw * 1000 : raw;
+  if (!Number.isFinite(ts) || ts < EARLIEST_FIELD_TIME_MS || ts > now + MAX_FIELD_CLOCK_LEAD_MS) return null;
+  return Math.floor(ts);
+}
+
 function isStale(live) {
-  // Treat implausibly future-dated telemetry as untrusted, not permanently
-  // "LIVE". A small 5-second sender/receiver clock skew remains tolerated.
-  const ts = sensorNumber(live?.system?.lastUpdate);
-  if (ts === null || ts <= 0) return true;
-  const age = Date.now() - ts;
-  return age > STALE_AFTER_MS || age < -5000;
+  const now = Date.now();
+  const ts = fieldTimeMs(live, now);
+  return ts === null || now - ts > STALE_AFTER_MS;
 }
 
 function ageText(live) {
-  const ts = Number(live?.system?.lastUpdate);
-  if (!Number.isFinite(ts) || ts <= 0) return 'NOT AVAILABLE';
-  const sec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+  const now = Date.now();
+  const ts = fieldTimeMs(live, now);
+  if (ts === null) return 'NOT AVAILABLE';
+  const sec = Math.max(0, Math.floor((now - ts) / 1000));
   if (sec < 2) return 'just now';
   if (sec < 60) return `${sec}s ago`;
   const min = Math.floor(sec / 60);
@@ -166,10 +185,10 @@ function stats(live) {
   if (!live) return '⚠️ FloodGuard live data is NOT AVAILABLE.';
   const gate = normalizeGate(live);
   const countdown = Number(live?.gate?.countdownSeconds);
-  const gateExtra = gate === 'COUNTDOWN' && Number.isFinite(countdown) && countdown > 0
+  const gateExtra = !isStale(live) && gate === 'COUNTDOWN' && Number.isFinite(countdown) && countdown > 0
     ? ` (${countdown}s)` : '';
 
-  return `🌊 *FLOODGUARD LIVE STATS*
+  return `🌊 *FLOODGUARD ${isStale(live) ? 'LAST RECORDED STATS' : 'LIVE STATS'}*
 
 ${freshnessLine(live)}
 
@@ -220,12 +239,12 @@ async function commandReply(jid, text, getLive) {
   if (c === 'gate') {
     const g = normalizeGate(live);
     const cd = Number(live?.gate?.countdownSeconds);
-    return `🚧 *DAM GATE*\n\nStatus: *${g}*\nAngle: ${v(live?.gate?.angle, '°')}\nCountdown: ${g === 'COUNTDOWN' && Number.isFinite(cd) ? `${cd} seconds` : '0 seconds'}\nReason: ${v(live?.gate?.reason)}\n\n${freshnessLine(live)}`;
+    return `🚧 *DAM GATE*\n\nStatus: *${g}*\nAngle: ${v(live?.gate?.angle, '°')}\nCountdown: ${isStale(live) ? 'NOT LIVE (stored countdown)' : g === 'COUNTDOWN' && Number.isFinite(cd) && cd > 0 ? `${cd} seconds` : 'NOT ACTIVE'}\nReason: ${v(live?.gate?.reason)}\n\n${freshnessLine(live)}`;
   }
 
   if (['rain', 'rainfall'].includes(c)) {
     if (!rainInstalled(live)) {
-      return `🌧️ *RAINFALL*\n\nRain Gauge: *${normalizeDevice(live?.devices?.rainGauge)}*\n\nReal collector sensor data is currently unavailable. No rainfall value is fabricated.`;
+      return `🌧️ *RAINFALL*\n\n${freshnessLine(live)}\n\nRain Gauge: *${normalizeDevice(live?.devices?.rainGauge)}*\n\nReal collector sensor data is currently unavailable. No rainfall value is fabricated.`;
     }
     const depth = live?.rain?.waterDepthCm;
     const raw = live?.rain?.rawValue;
@@ -235,7 +254,7 @@ async function commandReply(jid, text, getLive) {
   }
 
   if (['devices', 'health'].includes(c)) {
-    return `🔧 *DEVICE HEALTH*\n\n${deviceLines(live)}\n\n💾 MicroSD: NOT INSTALLED\n📱 GSM: NOT INSTALLED`;
+    return `🔧 *${isStale(live) ? 'LAST REPORTED DEVICE HEALTH' : 'DEVICE HEALTH'}*\n\n${freshnessLine(live)}\n\n${deviceLines(live)}\n\n💾 MicroSD: NOT INSTALLED\n📱 GSM: NOT INSTALLED`;
   }
 
   if (['network', 'esp', 'wifi'].includes(c)) {
@@ -243,7 +262,7 @@ async function commandReply(jid, text, getLive) {
   }
 
   if (['emergency', 'alarm'].includes(c)) {
-    return `🚨 *EMERGENCY STATUS*\n\nAlarm: ${boolText(live?.alarm?.active)}\nType: ${v(live?.alarm?.type)}\nRisk: *${risk(live)}*\nWater: *${level(live)}*\nGate: *${normalizeGate(live)}*`;
+    return `🚨 *${isStale(live) ? 'LAST RECORDED ALARM STATUS' : 'EMERGENCY STATUS'}*\n\n${freshnessLine(live)}\n\nAlarm: ${boolText(live?.alarm?.active)}\nType: ${v(live?.alarm?.type)}\nRisk: *${risk(live)}*\nWater: *${level(live)}*\nGate: *${normalizeGate(live)}*`;
   }
 
   return `❓ Unknown command: *${c || '(empty)'}*\n\nSend *menu* to see FloodGuard commands.`;
@@ -386,5 +405,6 @@ module.exports = {
   normalizeGate,
   normalizeDevice,
   level,
-  isStale
+  isStale,
+  fieldTimeMs
 };
