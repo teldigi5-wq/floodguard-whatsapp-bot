@@ -105,8 +105,8 @@ function fieldTimeMs(live, now = Date.now()) {
   if (typeof value === 'number' && Number.isFinite(value)) raw = value;
   else if (typeof value === 'string' && value.trim()) {
     const str = value.trim();
-    if (/^[+-]?\\d+(?:\\.\\d+)?$/.test(str)) raw = Number(str);
-    else if (/^\\d{4}-\\d\\d-\\d\\dT.+(?:Z|[+-]\\d\\d:\\d\\d)$/i.test(str)) raw = Date.parse(str);
+    if (/^[+-]?\d+(?:\.\d+)?$/.test(str)) raw = Number(str);
+    else if (/^\d{4}-\d\d-\d\dT.+(?:Z|[+-]\d\d:\d\d)$/i.test(str)) raw = Date.parse(str);
   }
   if (raw === null || !Number.isFinite(raw)) return null;
   const ts = raw < 1e12 ? raw * 1000 : raw;
