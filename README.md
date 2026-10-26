@@ -65,6 +65,20 @@ The bot **reads** telemetry; physical gate decisions stay within the embedded pr
 
 **Ownership and evidence:** This repository records the maintained Node.js/WhatsApp service, technical decisions and security-focused PRs under [teldigi5-wq](https://github.com/teldigi5-wq). The broader FloodGuard hardware system is a student project; credit collaborators for their own contributions. The commit history does not establish that every line was independently authored without tools or assistance.
 
+## Offline Command Center (synthetic demo only)
+
+The isolated [Command Center](docs/OFFLINE_COMMAND_CENTER.md) shows five **fictional, deterministic** flood scenarios, local diagnostics and a non-delivering chat command preview. It runs as a separate localhost-only process; it **does not import the live bot**, open WhatsApp/Baileys sessions, call Firebase, or operate physical devices.
+
+To try the interview demo without real accounts or hardware:
+
+1. Run `npm ci`.
+2. Copy `.env.example` to a private, untracked `.env` and set `FLOODGUARD_SETUP_TOKEN` to a locally generated, unique random token of at least 32 printable characters. Do **not** copy any real account/session credentials into this demo.
+3. Run `npm run start:demo` and open `http://127.0.0.1:8085` on the **same computer**. Authenticate with username `admin` and the configured private token.
+4. Switch between SAFE, WARNING, DANGER, STALE and OFFLINE scenarios, and use the simulated command/chat panel.
+5. Stop with Ctrl+C. Nothing has been sent to WhatsApp or Firebase.
+
+The demo protects its local endpoints with Basic authentication, strict Host/Origin checks, no-store headers and a restricted Content Security Policy. It is **not** a production administration interface or a substitute for hardware acceptance testing. Never publish the local listener to the Internet.
+
 ## Reproduce the automated checks
 
 Prerequisites: a compatible **patched Node.js 22 or 24 runtime** (CI uses 22.23.4 and 24.22.1). The following does not require live Firebase, a WhatsApp account or Arduino hardware:
@@ -78,7 +92,7 @@ npm test
 npm audit --omit=dev --audit-level=high
 ~~~
 
-The October 26, 2026 CI verification ran **18 tests successfully on both Node.js versions** (18 per matrix job), plus syntax/source checks and a production dependency audit. [View the workflow](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/actions/workflows/ci.yml). Passing synthetic tests is not the same as real WhatsApp delivery or a tested physical flood event.
+The configured CI includes synthetic tests on both Node.js versions, syntax/source checks and a production dependency audit; refer to the latest completed workflow for actual test counts. [View the workflow](https://github.com/teldigi5-wq/floodguard-whatsapp-bot/actions/workflows/ci.yml). Passing synthetic tests is not the same as real WhatsApp delivery or a tested physical flood event.
 
 ### Virtual test examples
 
