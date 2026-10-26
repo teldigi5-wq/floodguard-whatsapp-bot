@@ -106,3 +106,25 @@ test('losing exclusive ownership during a remote send stops the old worker', () 
     } finally {replacement.close();}
   })
 );
+
+
+test('fake dispatch begins before a queued microtask can supersede the field observation', () =>
+  fixture(async({box,now})=>{
+    const danger=makeObservation(now);
+    enqueue(box,danger);
+    let safeApplied=false;
+    const seen=[];
+    const running=box.drain({observation:danger,
+      authorizedRecipients:new Set([A,B]),sendTimeoutMs:3000,
+      send:async jid=>{
+        assert.equal(safeApplied,false,'send callback must not start after newer SAFE was observed');
+        seen.push(jid);
+      }
+    });
+    safeApplied=true;
+    const safe={...danger,phase:'SAFE',sourceAt:danger.sourceAt+200};
+    box.observe(safe);
+    await running;
+    assert.deepEqual(seen,[A], 'subsequent old DANGER job must not dispatch after SAFE');
+  })
+);
