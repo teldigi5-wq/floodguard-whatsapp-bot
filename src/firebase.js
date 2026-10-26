@@ -151,6 +151,9 @@ function streamLive() {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        // Every new SSE HTTP connection needs its own complete baseline.
+        // Never merge an initial PATCH with values from a prior connection.
+        let hasFreshRootSnapshot = false;
         while (!stopped) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -174,6 +177,14 @@ function streamLive() {
             if (eventType !== 'put' && eventType !== 'patch') continue;
             const payload = JSON.parse(dataLines.join('\n'));
             if (!plain(payload) || !Object.hasOwn(payload, 'data')) throw new Error('Malformed Firebase telemetry event');
+            if (!hasFreshRootSnapshot) {
+              // Firebase RTDB SSE starts with a root PUT. Ignore premature
+              // PATCHes until a fresh complete root snapshot establishes a
+              // coherent child reading. Incomplete baseline is not LIVE.
+              if (eventType !== 'put' || payload.path !== '/') continue;
+              hasFreshRootSnapshot = true;
+              values[key] = null;
+            }
             values[key] = mergeEvent(values[key], payload.path, payload.data, eventType);
             received.add(key);
             queuePublish();
@@ -190,6 +201,8 @@ function streamLive() {
         controllers.delete(controller);
         controller.abort();
         received.delete(key);
+        // Do not retain values from a disconnected stream generation.
+        delete values[key];
         connected = false;
       }
       if (!stopped) {
