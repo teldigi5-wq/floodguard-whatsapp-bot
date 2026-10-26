@@ -179,6 +179,11 @@ function streamLive() {
             queuePublish();
           }
         }
+        // HTTP/SSE may terminate cleanly (reader.read() returns done=true)
+        // even though a child telemetry stream has failed. Report the outage
+        // so the bot does not keep showing Firebase CONNECTED indefinitely.
+        // Deliberate stop() remains silent.
+        if (!stopped) throw new Error('Firebase telemetry stream closed unexpectedly');
       } catch (error) {
         if (!stopped) emitter.emit('error', error);
       } finally {
