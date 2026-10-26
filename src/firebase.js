@@ -154,7 +154,9 @@ function streamLive() {
         while (!stopped) {
           const { done, value } = await reader.read();
           if (done) break;
-          buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+          // Normalize after appending so CRLF split across network reads is handled.
+          buffer += decoder.decode(value, { stream: true });
+          buffer = buffer.replace(/\r\n/g, '\n');
           if (buffer.length > MAX_SSE_BUFFER) throw new Error('Firebase telemetry event buffer exceeded limit');
           let marker;
           while ((marker = buffer.indexOf('\n\n')) !== -1) {
