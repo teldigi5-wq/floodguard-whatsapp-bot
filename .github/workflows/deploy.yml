@@ -45,8 +45,14 @@ jobs:
             node -e "require('dotenv').config(); const t=process.env.FLOODGUARD_SETUP_TOKEN || ''; if(t.length < 32 || t.length > 512 || !/^[!-~]+$/.test(t)) { console.error('Secure administration token missing; deployment aborted before git reset.'); process.exit(1); }"
             # Fail closed on unsupported or unpatched Node lines before changing the checkout.
             node -e "const v=process.versions.node.split('.').map(Number); const ok=(v[0]===22&&(v[1]>23||(v[1]===23&&v[2]>=4)))||(v[0]===24&&(v[1]>22||(v[1]===22&&v[2]>=1))); if(!ok){console.error('Patched Node LTS 22.23.4+ or 24.22.1+ is required'); process.exit(1)}"
+            # Refuse to discard tracked/untracked server-side edits or locally
+            # provisioned files during a manual deployment.
+            if [ -n "$(git status --porcelain --untracked-files=normal)" ]; then
+              echo "Refusing to deploy over modified/untracked server files."; exit 1
+            fi
             git fetch origin main
             git reset --hard origin/main
             npm ci --omit=dev
+            npm audit --omit=dev --audit-level=high
             pm2 restart floodguard-whatsapp-bot --update-env || pm2 start ecosystem.config.js
             pm2 save

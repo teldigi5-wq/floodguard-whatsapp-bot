@@ -48,3 +48,6 @@ jobs:
           test -f src/webUi.js
           test -f package.json
           echo "FloodGuard project structure verified."
+
+      - name: Audit production dependencies (high severity)
+        run: npm audit --omit=dev --audit-level=high
