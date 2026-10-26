@@ -36,17 +36,25 @@ const WATER_SENSOR_TO_BOTTOM_CM = Number(process.env.WATER_SENSOR_TO_BOTTOM_CM |
 const WARNING_LEVEL_CM = 8.5;
 const DANGER_LEVEL_CM = 11.0;
 
+// Null and blank Firebase sensor values are NOT valid numeric measurements.
+// Number(null) and Number('') produce 0 and falsely report SAFE conditions.
+function sensorNumber(value) {
+  if (typeof value !== 'number' && typeof value !== 'string') return null;
+  if (typeof value === 'string' && !value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 function waterLevelCm(live) {
   // The physical HC-SR04 air gap is the authoritative live measurement.
   // Firebase multi-location PATCHes can briefly leave levelCm/status one event
   // behind distanceCm, so derive the level from distance whenever available.
-  const distance = Number(live?.water?.distanceCm);
-  if (Number.isFinite(distance) && distance > 0) {
+  const distance = sensorNumber(live?.water?.distanceCm);
+  if (distance !== null && distance > 0) {
     return Math.max(0, Math.min(WATER_SENSOR_TO_BOTTOM_CM, WATER_SENSOR_TO_BOTTOM_CM - distance));
   }
 
-  const direct = Number(live?.water?.levelCm);
-  if (Number.isFinite(direct) && direct >= 0) {
+  const direct = sensorNumber(live?.water?.levelCm);
+  if (direct !== null && direct >= 0) {
     return Math.max(0, Math.min(WATER_SENSOR_TO_BOTTOM_CM, direct));
   }
 
