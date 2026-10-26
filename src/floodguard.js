@@ -244,7 +244,7 @@ async function commandReply(jid, text, getLive) {
 
   if (['rain', 'rainfall'].includes(c)) {
     if (!rainInstalled(live)) {
-      return `🌧️ *RAINFALL*\n\nRain Gauge: *${normalizeDevice(live?.devices?.rainGauge)}*\n\nReal collector sensor data is currently unavailable. No rainfall value is fabricated.`;
+      return `🌧️ *RAINFALL*\n\n${freshnessLine(live)}\n\nRain Gauge: *${normalizeDevice(live?.devices?.rainGauge)}*\n\nReal collector sensor data is currently unavailable. No rainfall value is fabricated.`;
     }
     const depth = live?.rain?.waterDepthCm;
     const raw = live?.rain?.rawValue;
