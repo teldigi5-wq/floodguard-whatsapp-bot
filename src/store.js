@@ -163,6 +163,9 @@ function getState() {
   if (!privateRegularFileStatus(file('state.json'))) {
     throw new Error('Missing FloodGuard alert state; manual recovery required.');
   }
+  // On upgrade from an older installation, record history BEFORE processing
+  // another alert, not only after a send. The canonical state stays unchanged.
+  ensureStateRecordedMarker();
   const state = readJson('state.json', undefined);
   if (state === undefined) {
     throw new Error('Missing FloodGuard alert state; manual recovery required.');
