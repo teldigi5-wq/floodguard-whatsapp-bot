@@ -124,7 +124,7 @@ Draft integration of PRs #62 and #63. The active command replies for menu/help, 
 
 The fail-closed canonical-state reader and its owner-only recording marker remain in force during user-facing status checks. Missing or corrupt state produces an explicit UNKNOWN delivery warning; the offline inspector refuses a missing canonical file and never creates a new record. The uninitialized state is separately classified as `NOT_INITIALIZED` requiring manual review.
 
-`tests/alert-health-all-commands.test.js` and `tests/alert-state-loss.test.js` cover fake messages, subprocess restarts, read-only inspection, missing/symlinked state, persisted uncertainty, and operator-only first-install bootstrap. Combined tests must pass both Node.js CI versions before protected review. This does not establish exactly-once delivery, real user receipt, Firebase security, or physical flood safety.
+`tests/alert-health-all-commands.test.js` and `tests/alert-state-loss.test.js` cover fake messages, subprocess restarts, read-only inspection, missing/symlinked state, persisted uncertainty, and operator-only first-install bootstrap. The send loop now re-reads validated canonical state before **each** recipient attempt, preventing an additional fake recipient send after mid-batch state deletion or a newly recorded uncertainty latch. This bounds one class of partial-batch continuation but cannot cancel a send already started. Combined tests must pass both Node.js CI versions before protected review. This does not establish exactly-once delivery, real user receipt, Firebase security, or physical flood safety.
 
 ## Remaining virtual tests worth doing next
 
