@@ -92,6 +92,12 @@ The active REST/SSE client no longer exports **raw rejected fetch errors**, **fa
 
 Offline tests inject fictional credential-bearing URLs into both REST `fetch` and stream failures and into SSE `fetch` and reader failures after a root snapshot. Tests verify no private URL/token reaches callers or emitted `error` events. These are **synthetic transport checks**, not proof that all production SDKs, upstream proxies, log aggregators or WhatsApp dependencies are free of secret leakage. Real credentials and production Firebase were not accessed.
 
+## Same-source-clock flood recovery safeguards (2026-10-27)
+
+The active CommonJS `src/floodguard.js` now refuses a **water-hazard de-escalation** when an apparently safer observation has exactly the same normalized `system.lastUpdate` timestamp as the last confirmed WARNING/DANGER. A contradictory SAFE or WARNING patch at the same field clock is not independently newer physical evidence of recovery. It cannot clear the stored DANGER state or emit a recovery message. A newer, measured SAFE observation can still recover normally, and same-timestamp **hazard escalation** and independent dam-gate changes are preserved.
+
+The red-first isolated `tests/field-clock-deescalation.test.js` suite reproduced false SAFE recovery and DANGER→WARNING downgrade with fake readings and a fake WhatsApp sender; two control tests confirmed allowed escalation and gate updates. This is a small state-transition validation improvement and does **not** authenticate sensor hardware, establish Firebase RTDB authorization, remove the active serialized send-loop limitations, or prove delivery to a person.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
