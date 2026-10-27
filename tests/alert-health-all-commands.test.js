@@ -79,3 +79,31 @@ test('offline water command still includes the paused-delivery warning', async (
   assert.match(reply, /NOT AVAILABLE/);
   assert.match(reply, /ALERT DELIVERY PAUSED/);
 });
+
+
+test('uninitialized state is not reported as healthy by command or inspector', async () => {
+  saveState(state({ initialized: false, deliveryUncertain: false, deliveryDegraded: false }));
+  const reply = await commandReply(jid, 'menu', live);
+  assert.match(reply, /ALERT DELIVERY STATUS UNKNOWN/);
+  assert.match(reply, /manual warning/i);
+  const { spawnSync } = require('node:child_process');
+  const inspect = path.resolve(__dirname, '../scripts/inspect-delivery-recovery.js');
+  const report = spawnSync(process.execPath, [inspect], {
+    encoding: 'utf8', timeout: 1800,
+    env: { ...process.env, DATA_PATH: dir }
+  });
+  assert.equal(report.status, 2);
+  assert.deepEqual(JSON.parse(report.stdout.trim()), {
+    status: 'NOT_INITIALIZED', automaticAlertsPaused: null,
+    operatorReviewRequired: true, manualFallbackRequired: true
+  });
+  assert.equal(report.stderr, '');
+});
+
+test('missing alert-state record does not produce a falsely healthy menu', async () => {
+  fs.rmSync(stateFile, { force: true });
+  const reply = await commandReply(jid, 'menu', live);
+  assert.match(reply, /ALERT DELIVERY STATUS UNKNOWN/);
+  assert.match(reply, /manual warning/i);
+  assert.equal(fs.existsSync(stateFile), false, 'inspection may not bootstrap state');
+});
