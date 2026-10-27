@@ -60,6 +60,12 @@ The active `streamLive()` now sets a **10-second** initial-snapshot watchdog for
 
 Offline Node tests simulate an AbortSignal-aware stalled HTTP handshake, premature PATCHes with no initial root PUT, and a healthy indefinitely open SSE after a valid baseline. Normal `stop()` clears outstanding snapshot timers in addition to reconnect timers. These tests are **not** proof of production Firebase reliability or rule authorization. A transport that ignores cancellation entirely is outside this mocked liveness contract.
 
+## Local admin failed-authentication throttle (2026-10-27)
+
+The shared loopback-only Basic-auth guard now limits failed credentials across its protected routes: **32 failed attempts in a 60-second window**, followed by a **60-second temporary lockout**, returning HTTP `429` and `Retry-After` rather than repeatedly challenging credentials. Correct authentication resets the failed-attempt budget outside a lockout; even correct credentials cannot bypass an active lockout. The limiter uses **one bounded in-memory counter per guard instance**, never the untrusted `X-Forwarded-For` header, and does not store passwords or tokens.
+
+Deterministic offline tests inject a private synthetic token, short test limits, and a fake clock to exercise lockout, expiry, authorized recovery and forwarded-header spoofing. Node CI and the offline Chromium workflow verify that existing routes remain functional. This is **not** a distributed, persistent or internet-facing rate limiter; process restart clears counters, and excessive bad requests can temporarily deny access to the legitimate operator. The administrative service must remain on loopback behind an operator-approved tunnel/TLS boundary. No live host or account was tested.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
