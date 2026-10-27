@@ -9,7 +9,7 @@ const path = require('node:path');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'floodguard-virtual-test-'));
 process.env.DATA_PATH = dir;
-const { subscribe, getState } = require('../src/store');
+const { subscribe, getState, saveState } = require('../src/store');
 const { commandReply, processLiveChange, level, isStale, normalizeGate } = require('../src/floodguard');
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
@@ -47,6 +47,8 @@ test('missing, null, blank and invalid sensor measurements never become zero or 
 });
 
 test('virtual WhatsApp receives state transitions, not duplicate or stale flood alerts', async () => {
+  // Deliberate fixture bootstrap; absent production state fails closed.
+  saveState({initialized:false,level:'UNKNOWN',gateStatus:'UNKNOWN',procedureId:null,sentCountdown:[]});
   const sent = [];
   const jid = 'test-only@s.whatsapp.net';
   const sock = { sendMessage: async (recipient, content) => sent.push({ recipient, text: content.text }) };

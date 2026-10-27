@@ -8,6 +8,25 @@ The active alert-send path has a bounded local wait. If a WhatsApp send does not
 
 **Do not assume the physical hazard is safe just because this software is paused.** Use an approved independent/manual warning channel for any actual flood hazard.
 
+## Missing state and first-install bootstrap
+
+`DATA_PATH/state.json` is safety-critical. Missing canonical state must never be treated as a safe alert-history reset. The service now refuses alert processing without a valid canonical file. An independent owner-only `state.ever-recorded` marker is created before the first continued alert-state read/write under this version. If a previously recorded state disappears, that marker prevents silent recreation by normal state writes.
+
+**Genuinely new installations only:** after an authorized operator selects a new, empty, absolute local `DATA_PATH`, and *before* starting live service, they may run:
+
+```sh
+export DATA_PATH=/absolute/private/floodguard-data
+mkdir -p -m 700 "$DATA_PATH"
+npm run state:bootstrap -- --acknowledge-new-installation
+npm run recovery:inspect
+```
+
+The bootstrap command requires the exact acknowledgment flag and an empty, existing, nonsymlink directory. It writes only the private uninitialized alert state and its marker. It does not start WhatsApp, connect Firebase, establish user consent, replay messages, or certify safety. The inspector returns `NOT_INITIALIZED` with exit code 2, requiring review, until valid alert-state initialization.
+
+**Never use this bootstrap command for recovery.** If `state.json` disappears, the marker remains, or old authentication/subscriber files exist, stop automatic alert operations, activate the approved manual warning channel, preserve confidential backups and logs, and investigate the preceding delivery uncertainty. Do not delete marker/state files, reset flags, restore unverified stale state, or replay automatic messages. Restoration requires a separately authorized and tested operator procedure.
+
+These local checks are not tamper-proof against a host administrator or attacker able to replace all private files; `fsync` alone does not guarantee sudden-power-loss durability. They cannot prove actual WhatsApp receipt or a safe water level.
+
 ## Offline inspection (read-only)
 
 From the project checkout on the operator's authorized machine, with the **existing private** `DATA_PATH` configured:
@@ -22,6 +41,7 @@ The command reads only `DATA_PATH/state.json`. It does not import or launch `bot
 | --- | ---: | --- |
 | `PAUSED_UNCERTAIN_DELIVERY` | 2 | Delivery outcome is ambiguous; automatic alerts are paused and operator review/manual warning are necessary |
 | `DELIVERY_DEGRADED` | 2 | A past send failure was recorded; automatic sends are not necessarily paused, but receipt needs review |
+| `NOT_INITIALIZED` | 2 | Uninitialized prior state; operator review/manual warning required |
 | `NO_RECORDED_FAILURE` | 0 | No explicit delivery-failure flag recorded. **Not proof of delivery or health** |
 | `INSPECTION_FAILED` | 3 | Missing, malformed, oversized, symlinked or unreadable canonical state. Treat automatic alert health as unknown, never reset state from this check |
 

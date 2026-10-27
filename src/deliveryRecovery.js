@@ -30,6 +30,13 @@ function assessDeliveryState(state) {
       manualFallbackRequired:true
     };
   }
+  // An uninitialized baseline is not evidence of normal alert delivery.
+  if (state.initialized === false) {
+    return {
+      status:'NOT_INITIALIZED',automaticAlertsPaused:null,
+      operatorReviewRequired:true,manualFallbackRequired:true
+    };
+  }
   return {
     status:'NO_RECORDED_FAILURE',
     automaticAlertsPaused:false,
