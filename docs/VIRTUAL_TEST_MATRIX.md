@@ -78,6 +78,14 @@ The active `streamLive()` now distinguishes receiving the first complete child s
 
 Synthetic tests exercise one silent water channel while other streams keep sending heartbeats, subsequent reconnect to a changed DANGER root, a healthy unchanged reading kept alive by recognized heartbeat events, comment-only traffic failing closed, invalid options and a separate Node subprocess exiting after intentional stop. These verify the mock transport behavior, **not** actual Firebase permissions, source authentication, sensor freshness, mobile connectivity or real alert receipt. A valid heartbeat only indicates SSE connection liveness; it does not prove the physical sensor produced a recent measurement.
 
+## Local subscriber identity and capacity boundaries (2026-10-27)
+
+The active `src/store.js` now restricts persisted WhatsApp subscribers to supported, well-formed Baileys chat identifiers for individual (`@s.whatsapp.net`), linked-device (`@lid`) and group (`@g.us`) destinations. It refuses embedded whitespace, control characters, arbitrary external domains and status-broadcast recipients before writing the canonical private file. A repeated valid subscription is idempotent, and unsubscribe retains its existing semantics.
+
+The private subscriber list is limited to **512 entries**, and a JSON subscriber file larger than **128 KiB** is rejected before parsing. Oversized, invalid or tampered lists are **not** silently truncated or overwritten. New enrollment when full produces a fixed capacity failure. The policy protects against unbounded local send loops; it does **not** authenticate a user as the rightful owner of a WhatsApp JID or certify message delivery.
+
+`tests/subscriber-store-validation.test.js` exercises fake individual/LID/group JIDs, malicious malformed destinations, persisted corrupt entries, full and oversized subscriber lists, failure privacy, existing state preservation and idempotent enrollment. Only synthetic test recipients are used. **Operational caveat:** existing legacy subscriber records using unusual identifiers may need operator-controlled review and migration; they are deliberately not accepted automatically. Full installation/real-account tests remain separate.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
