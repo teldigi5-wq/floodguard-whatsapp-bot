@@ -170,8 +170,13 @@ function writeJson(name, value) {
 function getSubscribers() {
   // Fail closed if a recorded list disappears or is replaced by a symlink.
   // Legacy canonical lists gain the independent marker before use.
-  ensureSubscribersRecordedMarker();
-  const data = readJson('subscribers.json', []);
+  const existed = ensureSubscribersRecordedMarker();
+  // The file may disappear after lstat but before read. ENOENT must not
+  // silently yield an empty recipient set if enrollment was already present.
+  const data = readJson('subscribers.json', existed ? undefined : []);
+  if (existed && data === undefined) {
+    throw new Error('FloodGuard subscriber store unavailable after recording; manual recovery required.');
+  }
   if (!Array.isArray(data) || data.length > MAX_SUBSCRIBERS ||
       data.some(jid => !validSubscriberJid(jid))) {
     throw new Error('Invalid FloodGuard subscriber capacity or recipient; manual private recovery required.');
