@@ -54,6 +54,12 @@ Offline red/green tests now simulate a complete first water snapshot, remote chi
 
 An isolated child-process test stubs all Firebase child HTTP requests to return 503, allowing the nine SSE watchers to enter their reconnect backoff. `stream.stop()` now cancels and releases pending retry waits immediately rather than retaining 1–30-second Node.js timers after intentional shutdown. The child exits normally, without force-killing the process. This test uses only stubbed `fetch` responses; it does not access production Firebase or prove deployment/network behavior.
 
+## Firebase initial-snapshot liveness watchdog (2026-10-27)
+
+The active `streamLive()` now sets a **10-second** initial-snapshot watchdog for **each** of the nine allowlisted child SSE streams. The deadline starts before the HTTP handshake and ends only after that child supplies its own complete root `put` event. A stalled handshake or stream that never sends the first root snapshot is aborted and emits the fixed `Firebase telemetry initial snapshot timed out` diagnostic through the existing reconnect handler. The timeout is configurable between 25 and 60,000 milliseconds solely for controlled virtual tests; invalid settings are rejected before any stream watcher starts.
+
+Offline Node tests simulate an AbortSignal-aware stalled HTTP handshake, premature PATCHes with no initial root PUT, and a healthy indefinitely open SSE after a valid baseline. Normal `stop()` clears outstanding snapshot timers in addition to reconnect timers. These tests are **not** proof of production Firebase reliability or rule authorization. A transport that ignores cancellation entirely is outside this mocked liveness contract.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.

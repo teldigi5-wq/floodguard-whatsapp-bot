@@ -110,7 +110,12 @@ function mergeEvent(current, path, incoming, eventType) {
   return root;
 }
 
-function streamLive() {
+function streamLive({ initialSnapshotTimeoutMs = 10000 } = {}) {
+  // A child that never finishes its first snapshot must not leave monitoring
+  // awaiting completeness indefinitely. Bound and validate the local watchdog.
+  if (!Number.isSafeInteger(initialSnapshotTimeoutMs) ||
+      initialSnapshotTimeoutMs < 25 || initialSnapshotTimeoutMs > 60000)
+    throw new Error('Invalid Firebase initial snapshot timeout');
   const emitter = new EventEmitter();
   let stopped = false;
   let connected = false;
@@ -119,6 +124,7 @@ function streamLive() {
   // Every child may be sleeping through exponential reconnect backoff.
   // Stop must release those waits immediately, not retain 1–30 s timers.
   const retryWaiters = new Map();
+  const initialWatchdogs = new Set();
   const values = Object.create(null);
   const received = new Set();
 
@@ -154,6 +160,14 @@ function streamLive() {
     while (!stopped) {
       const controller = new AbortController();
       controllers.add(controller);
+      let initialSnapshotTimedOut = false;
+      const initialTimer = setTimeout(() => {
+        initialWatchdogs.delete(initialTimer);
+        if (stopped) return;
+        initialSnapshotTimedOut = true;
+        controller.abort(); // Includes HTTP handshake and initial SSE read.
+      }, initialSnapshotTimeoutMs);
+      initialWatchdogs.add(initialTimer);
       try {
         const response = await fetch(childUrl(child), {
           redirect: 'error',
@@ -196,7 +210,11 @@ function streamLive() {
               // PATCHes until a fresh complete root snapshot establishes a
               // coherent child reading. Incomplete baseline is not LIVE.
               if (eventType !== 'put' || payload.path !== '/') continue;
+              if (initialSnapshotTimedOut)
+                throw new Error('Firebase telemetry initial snapshot timed out');
               hasFreshRootSnapshot = true;
+              clearTimeout(initialTimer);
+              initialWatchdogs.delete(initialTimer);
               values[key] = null;
             }
             values[key] = mergeEvent(values[key], payload.path, payload.data, eventType);
@@ -210,8 +228,11 @@ function streamLive() {
         // Deliberate stop() remains silent.
         if (!stopped) throw new Error('Firebase telemetry stream closed unexpectedly');
       } catch (error) {
-        if (!stopped) emitter.emit('error', error);
+        if (!stopped) emitter.emit('error', initialSnapshotTimedOut
+          ? new Error('Firebase telemetry initial snapshot timed out') : error);
       } finally {
+        clearTimeout(initialTimer);
+        initialWatchdogs.delete(initialTimer);
         controllers.delete(controller);
         controller.abort();
         received.delete(key);
@@ -239,6 +260,8 @@ function streamLive() {
       finish();
     }
     retryWaiters.clear();
+    for (const timer of initialWatchdogs) clearTimeout(timer);
+    initialWatchdogs.clear();
     for (const controller of controllers) controller.abort();
   };
   return emitter;
