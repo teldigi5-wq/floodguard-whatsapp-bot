@@ -309,6 +309,10 @@ async function sendAll(sock, text) {
     if (recorded.initialized !== true || recorded.deliveryUncertain === true) {
       throw new Error('FloodGuard alert state not eligible for delivery; manual recovery required');
     }
+    // Revalidate durable subscriber consent/record integrity before EACH
+    // recipient. A missing list must not become a silent empty enrollment,
+    // and an unsubscribe during a prior send takes effect immediately.
+    if (!getSubscribers().has(jid)) continue;
     let timer;
     try {
       // Invoke promptly; rejected/synchronous errors have known failure
@@ -336,6 +340,9 @@ async function sendAll(sock, text) {
       if (timer !== undefined) clearTimeout(timer);
     }
   }
+  // Detect subscriber-store deletion or corruption during the final send,
+  // even when there is no next recipient to trigger the loop guard.
+  getSubscribers();
   return { failures, uncertain: false };
 }
 
