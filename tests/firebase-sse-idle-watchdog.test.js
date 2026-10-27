@@ -120,7 +120,16 @@ test('unrecognized comment-only chatter does not indefinitely mask stale telemet
 
 test('invalid idle timeouts are rejected before watchers start',()=>{
   for(const idleTimeoutMs of [0,-3,1.5,NaN,Infinity,300001,'100']) {
-    assert.throws(()=>streamLive({idleTimeoutMs}),/idle|timeout|invalid/i);
+    let unexpectedWatcher;
+    try {
+      assert.throws(()=>{
+        unexpectedWatcher=streamLive({idleTimeoutMs});
+      },/idle|timeout|invalid/i);
+    } finally {
+      // Red-first regression safety: if an old implementation unexpectedly
+      // returns, stop synchronously BEFORE its queued network workers start.
+      unexpectedWatcher?.stop();
+    }
   }
 });
 
