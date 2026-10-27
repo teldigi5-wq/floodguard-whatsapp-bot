@@ -50,6 +50,17 @@ test('unexpected subscriber-file deletion fails closed rather than silently clea
   assert.equal(fs.existsSync(recipientsFile),false);
 });
 
+test('a normal alert-state record cannot mask a lost subscriber registry in commands',async()=>{
+  saveState(fixture());
+  const {commandReply} = require('../src/floodguard');
+  const response=await commandReply(one,'menu',live);
+  assert.match(response,/ALERT DELIVERY STATUS UNKNOWN/);
+  assert.match(response,/manual warning/i);
+  assert.doesNotMatch(response,/synthetic-first|synthetic-second/i);
+  assert.equal(fs.existsSync(recipientsFile),false,
+    'a command must not reconstruct an empty subscriber registry');
+});
+
 test('process restart recognizes lost subscriber list without logging private identifiers',()=>{
   const code = [
     "const {getSubscribers}=require('./src/store');",
