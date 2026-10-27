@@ -104,6 +104,14 @@ The active CommonJS `src/floodguard.js` previously awaited each `sock.sendMessag
 
 Isolated `tests/alert-send-timeout.test.js` uses only fictional WhatsApp JIDs, a fake socket, and temporary state files to verify stalled sends, no subsequent sends or false recovery after ambiguous DANGER, late success, ordinary rejection accounting, normal DANGER/recovery transitions and invalid policies. The timeout bounds the application wait but **cannot cancel remote delivery**, certify that someone received an alert, or guarantee exactly-once operation. This fail-closed policy may suppress later notifications until reviewed, so an explicit manual flood warning / alternate escalation procedure is required before considering any production rollout. No real accounts, Firebase, devices or deployment were accessed.
 
+## Read-only uncertain-delivery inspector and user-visible alert status (2026-10-27)
+
+After a bounded WhatsApp send timeout, the active bot persists `deliveryUncertain: true` and suppresses further outgoing automatic alerts until reviewed. The user-facing `stats`/`status`, `risk`/`flood`, `emergency`/`alarm` and new `subscribe` responses now explicitly report `ALERT DELIVERY PAUSED`, advise manual warning and avoid falsely promising messages. Ordinary partial delivery failures remain separately described as `DELIVERY DEGRADED`. If private state cannot be read, they report that alert-delivery status is unknown.
+
+A deliberately **read-only** command, `npm run recovery:inspect`, inspects only the operator-configured canonical local `DATA_PATH/state.json` and prints fixed, non-sensitive status flags with exit codes 0 (no recorded failure), 2 (operator review) or 3 (invalid/missing state). It refuses symlinked, oversized, invalid and corrupt state rather than creating or rewriting anything, clearing the latch, replaying alerts or importing the live bot. Synthetic tests exercise paused/degraded/normal states, honest command responses, redaction, file immutability, malformed or missing records, symlink refusal and size bounds.
+
+**Manual recovery is not implemented:** see `docs/DELIVERY_UNCERTAINTY_RECOVERY.md` for the operator-only warning fallback and required separate authorization. This check cannot verify actual WhatsApp receipt, physical water conditions, RTDB access rules, or host security.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
