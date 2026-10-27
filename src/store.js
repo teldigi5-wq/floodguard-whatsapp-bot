@@ -8,13 +8,36 @@ const { randomUUID } = require('node:crypto');
 const DATA_PATH = process.env.DATA_PATH || path.join(process.cwd(), 'data');
 fs.mkdirSync(DATA_PATH, { recursive: true, mode: 0o700 });
 const file = name => path.join(DATA_PATH, name);
+const MAX_SUBSCRIBERS = 512;
+const MAX_SUBSCRIBER_BYTES = 128 * 1024;
+// Match the supported Baileys chat identities (individual, LID or group).
+// Do not allow newlines/control characters, arbitrary domains or status
+// broadcast identifiers to enter persistent delivery records.
+function validSubscriberJid(jid) {
+  return typeof jid === 'string' &&
+    /^[A-Za-z0-9._:+-]{1,128}@(s\.whatsapp\.net|lid|g\.us)$/.test(jid);
+}
+function requireSubscriberJid(jid) {
+  if (!validSubscriberJid(jid)) {
+    throw new Error('Invalid FloodGuard subscriber recipient; no change persisted.');
+  }
+}
 
 function readJson(name, fallback) {
   let raw;
   try {
+    if (name === 'subscribers.json') {
+      const bytes = fs.statSync(file(name)).size;
+      if (!Number.isSafeInteger(bytes) || bytes > MAX_SUBSCRIBER_BYTES) {
+        throw new Error('Oversized FloodGuard subscriber store');
+      }
+    }
     raw = fs.readFileSync(file(name), 'utf8');
   } catch (error) {
     if (error?.code === 'ENOENT') return fallback;
+    if (name === 'subscribers.json' && error?.message === 'Oversized FloodGuard subscriber store') {
+      throw new Error('Invalid FloodGuard subscriber store: oversized private data; manual recovery required.');
+    }
     throw new Error('Unreadable FloodGuard local ' + name + '; inspect the private backup.');
   }
   try {
@@ -59,21 +82,28 @@ function writeJson(name, value) {
 
 function getSubscribers() {
   const data = readJson('subscribers.json', []);
-  if (!Array.isArray(data) ||
-      data.some(jid => typeof jid !== 'string' || !jid.trim() || jid.length > 512)) {
-    throw new Error('Invalid FloodGuard subscriber store; manual private recovery required.');
+  if (!Array.isArray(data) || data.length > MAX_SUBSCRIBERS ||
+      data.some(jid => !validSubscriberJid(jid))) {
+    throw new Error('Invalid FloodGuard subscriber capacity or recipient; manual private recovery required.');
   }
   return new Set(data);
 }
 
 function subscribe(jid) {
+  requireSubscriberJid(jid);
   const subscribers = getSubscribers();
+  if (subscribers.has(jid)) return; // Preserve idempotency without an extra disk write.
+  if (subscribers.size >= MAX_SUBSCRIBERS) {
+    throw new Error('FloodGuard subscriber capacity limit reached; enrollment refused.');
+  }
   subscribers.add(jid);
   writeJson('subscribers.json', [...subscribers]);
 }
 
 function unsubscribe(jid) {
+  requireSubscriberJid(jid);
   const subscribers = getSubscribers();
+  if (!subscribers.has(jid)) return;
   subscribers.delete(jid);
   writeJson('subscribers.json', [...subscribers]);
 }
