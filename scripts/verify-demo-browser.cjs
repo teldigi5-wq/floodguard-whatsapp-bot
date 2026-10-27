@@ -228,10 +228,12 @@ function cdpsocket(url) {
     await evaluate("document.querySelector('[data-command=water]').focus();true");
     assert.equal(await evaluate("document.activeElement.dataset.command==='water'"),true);
     await cdp.call('Input.dispatchKeyEvent',{
-      type:'rawKeyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13
+      type:'keyDown',key:'Enter',code:'Enter',
+      windowsVirtualKeyCode:13,nativeVirtualKeyCode:13,text:'\\r',unmodifiedText:'\\r'
     });
     await cdp.call('Input.dispatchKeyEvent',{
-      type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13
+      type:'keyUp',key:'Enter',code:'Enter',
+      windowsVirtualKeyCode:13,nativeVirtualKeyCode:13
     });
     await until("document.querySelectorAll('#chatLog .bubble').length===2",
       'keyboard Enter initiated fictional preview reply');
