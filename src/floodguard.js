@@ -302,6 +302,13 @@ async function sendAll(sock, text) {
   const subscribers = [...getSubscribers()];
   let failures = 0;
   for (const jid of subscribers) {
+    // The canonical alert state may have vanished or become quarantined after
+    // an earlier recipient was contacted. Check before EACH next external send
+    // so a partial batch cannot silently continue after lost local evidence.
+    const recorded = getState();
+    if (recorded.initialized !== true || recorded.deliveryUncertain === true) {
+      throw new Error('FloodGuard alert state not eligible for delivery; manual recovery required');
+    }
     let timer;
     try {
       // Invoke promptly; rejected/synchronous errors have known failure
