@@ -326,6 +326,17 @@ async function processLiveChangeSerial(sock, live) {
     currentLevel = state.level;
   }
 
+  // A later-arriving SSE patch may share the exact same field timestamp as
+  // the last confirmed water reading. Such a contradictory snapshot is not
+  // newer physical evidence for a reduction in flood severity. Preserve the
+  // confirmed hazard until a strictly newer source timestamp is observed.
+  // Same-clock escalations and independent gate updates are still permitted.
+  const waterSeverity = { SAFE: 0, WARNING: 1, DANGER: 2 };
+  if (sourceAt !== null && sourceAt === lastSourceAt &&
+      Object.hasOwn(waterSeverity, state.level) &&
+      Object.hasOwn(waterSeverity, currentLevel) &&
+      waterSeverity[currentLevel] < waterSeverity[state.level]) return;
+
   // Never generate safety alerts from stale snapshots.
   // We still update heartbeat metadata so the bot remains observable.
   if (stale) {
