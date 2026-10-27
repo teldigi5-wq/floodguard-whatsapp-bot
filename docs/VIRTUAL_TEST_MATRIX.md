@@ -112,6 +112,10 @@ A deliberately **read-only** command, `npm run recovery:inspect`, inspects only 
 
 **Manual recovery is not implemented:** see `docs/DELIVERY_UNCERTAINTY_RECOVERY.md` for the operator-only warning fallback and required separate authorization. This check cannot verify actual WhatsApp receipt, physical water conditions, RTDB access rules, or host security.
 
+## Paused delivery visibility across all WhatsApp commands (2026-10-27)
+
+In addition to the existing status/risk/emergency/subscription warnings, the active bot now appends the same fixed, redacted delivery-health warning to menu/help, water, gate, rain, device health, network, unsubscribe and unknown-command responses. The menu no longer implies that requesting subscription proves alerts are enabled. A synthetic command matrix verifies quarantined, degraded, normal and corrupt private states, unchanged alert quarantine, redacted errors and an offline water response. These are **local response-content checks**; they do not prove real WhatsApp receipt, live sensor operation, or manual-recovery readiness.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
