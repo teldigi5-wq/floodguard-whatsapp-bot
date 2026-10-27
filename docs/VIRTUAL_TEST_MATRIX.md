@@ -72,6 +72,12 @@ The active CommonJS `src/store.js` now stages changes to subscriber and alert-st
 
 Offline fault-injection tests simulate an attacker-planted legacy `state.json.tmp` symlink, partial ENOSPC writes, EROFS-style rename failures, file-sync errors, abandoned crash temp files and owner-only file permissions. They also simulate an explicit operator-owned backup, deliberate canonical corruption and **manual** backup restoration. The application intentionally does not scan or silently promote abandoned temp files or backups. These are **synthetic tests on GitHub Actions filesystems**, not certified sudden-power-loss durability, automatic crash recovery, Windows filesystem semantics or verified operator backups. Actual disk/host permissions, secure backup storage and rollback still need owner acceptance.
 
+## Firebase SSE post-baseline inactivity watchdog (2026-10-27)
+
+The active `streamLive()` now distinguishes receiving the first complete child snapshot from the **ongoing liveness** of each of the nine Firebase RTDB SSE channels. After a valid root `put`, a per-child **120-second default inactivity deadline** is reset only by a valid `put`/`patch` data event or Firebase `keep-alive` event. Unrecognized comment-only chatter and arbitrary partial bytes do not reset the deadline. A silent stream triggers a fixed, redacted `Firebase telemetry stream idle timed out` error and a new connection must obtain a **fresh root snapshot** before becoming connected again. The idle deadline is injected at 25–300,000 ms only for deterministic virtual testing; deliberate `stop()` cancels all associated timers.
+
+Synthetic tests exercise one silent water channel while other streams keep sending heartbeats, subsequent reconnect to a changed DANGER root, a healthy unchanged reading kept alive by recognized heartbeat events, comment-only traffic failing closed, invalid options and a separate Node subprocess exiting after intentional stop. These verify the mock transport behavior, **not** actual Firebase permissions, source authentication, sensor freshness, mobile connectivity or real alert receipt. A valid heartbeat only indicates SSE connection liveness; it does not prove the physical sensor produced a recent measurement.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.

@@ -110,12 +110,15 @@ function mergeEvent(current, path, incoming, eventType) {
   return root;
 }
 
-function streamLive({ initialSnapshotTimeoutMs = 10000 } = {}) {
-  // A child that never finishes its first snapshot must not leave monitoring
-  // awaiting completeness indefinitely. Bound and validate the local watchdog.
+function streamLive({ initialSnapshotTimeoutMs = 10000, idleTimeoutMs = 120000 } = {}) {
+  // Bound both first-snapshot startup and post-baseline silence.
+  // A TCP connection alone is not evidence of continuing telemetry health.
   if (!Number.isSafeInteger(initialSnapshotTimeoutMs) ||
       initialSnapshotTimeoutMs < 25 || initialSnapshotTimeoutMs > 60000)
     throw new Error('Invalid Firebase initial snapshot timeout');
+  if (!Number.isSafeInteger(idleTimeoutMs) ||
+      idleTimeoutMs < 25 || idleTimeoutMs > 300000)
+    throw new Error('Invalid Firebase SSE idle timeout');
   const emitter = new EventEmitter();
   let stopped = false;
   let connected = false;
@@ -125,6 +128,7 @@ function streamLive({ initialSnapshotTimeoutMs = 10000 } = {}) {
   // Stop must release those waits immediately, not retain 1–30 s timers.
   const retryWaiters = new Map();
   const initialWatchdogs = new Set();
+  const idleWatchdogs = new Set();
   const values = Object.create(null);
   const received = new Set();
 
@@ -161,6 +165,23 @@ function streamLive({ initialSnapshotTimeoutMs = 10000 } = {}) {
       const controller = new AbortController();
       controllers.add(controller);
       let initialSnapshotTimedOut = false;
+      let idleTimedOut = false;
+      let idleTimer = null;
+      function refreshIdle() {
+        if (idleTimer !== null) {
+          clearTimeout(idleTimer);
+          idleWatchdogs.delete(idleTimer);
+        }
+        const timer = setTimeout(() => {
+          idleWatchdogs.delete(timer);
+          idleTimer = null;
+          if (stopped) return;
+          idleTimedOut = true;
+          controller.abort();
+        }, idleTimeoutMs);
+        idleTimer = timer;
+        idleWatchdogs.add(timer);
+      }
       const initialTimer = setTimeout(() => {
         initialWatchdogs.delete(initialTimer);
         if (stopped) return;
@@ -202,6 +223,12 @@ function streamLive({ initialSnapshotTimeoutMs = 10000 } = {}) {
             if (eventType === 'cancel' || eventType === 'auth_revoked') {
               throw new Error('Firebase telemetry access revoked');
             }
+            // A Firebase keep-alive is a semantic heartbeat. Unrecognized
+            // comments and raw trickle bytes do NOT establish stream health.
+            if (eventType === 'keep-alive') {
+              if (hasFreshRootSnapshot) refreshIdle();
+              continue;
+            }
             if (eventType !== 'put' && eventType !== 'patch') continue;
             const payload = JSON.parse(dataLines.join('\n'));
             if (!plain(payload) || !Object.hasOwn(payload, 'data')) throw new Error('Malformed Firebase telemetry event');
@@ -219,6 +246,7 @@ function streamLive({ initialSnapshotTimeoutMs = 10000 } = {}) {
             }
             values[key] = mergeEvent(values[key], payload.path, payload.data, eventType);
             received.add(key);
+            refreshIdle();
             queuePublish();
           }
         }
@@ -228,9 +256,16 @@ function streamLive({ initialSnapshotTimeoutMs = 10000 } = {}) {
         // Deliberate stop() remains silent.
         if (!stopped) throw new Error('Firebase telemetry stream closed unexpectedly');
       } catch (error) {
-        if (!stopped) emitter.emit('error', initialSnapshotTimedOut
-          ? new Error('Firebase telemetry initial snapshot timed out') : error);
+        if (!stopped) emitter.emit('error', idleTimedOut
+          ? new Error('Firebase telemetry stream idle timed out')
+          : initialSnapshotTimedOut
+            ? new Error('Firebase telemetry initial snapshot timed out') : error);
       } finally {
+        if (idleTimer !== null) {
+          clearTimeout(idleTimer);
+          idleWatchdogs.delete(idleTimer);
+          idleTimer = null;
+        }
         clearTimeout(initialTimer);
         initialWatchdogs.delete(initialTimer);
         controllers.delete(controller);
@@ -262,6 +297,8 @@ function streamLive({ initialSnapshotTimeoutMs = 10000 } = {}) {
     retryWaiters.clear();
     for (const timer of initialWatchdogs) clearTimeout(timer);
     initialWatchdogs.clear();
+    for (const timer of idleWatchdogs) clearTimeout(timer);
+    idleWatchdogs.clear();
     for (const controller of controllers) controller.abort();
   };
   return emitter;
