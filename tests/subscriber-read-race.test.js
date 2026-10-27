@@ -11,7 +11,7 @@ const { spawnSync } = require('node:child_process');
 test('unexpected ENOENT after a recorded subscriber exists never becomes empty recipients', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fg-subscriber-race-'));
   const recipient = 'synthetic-race@s.whatsapp.net';
-  const script = String.raw\`
+  const script = String.raw`
     'use strict';
     const fs = require('node:fs');
     const path = require('node:path');
@@ -42,7 +42,7 @@ test('unexpected ENOENT after a recorded subscriber exists never becomes empty r
     } finally {
       fs.readFileSync = current;
     }
-  \`.replace(/^\s{4}/gm,'');
+  `.replace(/^\s{4}/gm,'');
   try {
     const result = spawnSync(process.execPath, ['-e', script], {
       cwd: path.resolve(__dirname, '..'), encoding: 'utf8',
