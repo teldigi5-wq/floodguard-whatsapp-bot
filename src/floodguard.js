@@ -191,6 +191,9 @@ function deliveryNotice() {
     if (health.status==='DELIVERY_DEGRADED') {
       return '\n\n⚠️ *DELIVERY DEGRADED*\nSome automatic alert attempts failed. Recipient receipt has not been verified; use a manual warning if needed.';
     }
+    if (health.status==='NOT_INITIALIZED') {
+      return '\n\n⚠️ *ALERT DELIVERY STATUS UNKNOWN*\nNo verified alert-state baseline has been recorded. Do not rely on automatic delivery; use a manual warning and ask the operator to inspect local state.';
+    }
     return '';
   } catch {
     return '\n\n⚠️ *ALERT DELIVERY STATUS UNKNOWN*\nAutomatic warning delivery cannot be verified. Use a manual warning and ask the operator to inspect the private state.';
