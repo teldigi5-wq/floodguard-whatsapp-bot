@@ -178,6 +178,23 @@ test('losing state during a multi-recipient send blocks remaining fake recipient
   fs.writeFileSync(canonical, JSON.stringify(state()), { mode: 0o600 });
 });
 
+test('re-quarantine during a fake recipient batch blocks all later recipients', async () => {
+  saveState(state({ deliveryUncertain: false, deliveryDegraded: false }));
+  let attempts = 0;
+  const sock = { sendMessage: async () => {
+    attempts++;
+    if (attempts === 1) {
+      saveState(state({ deliveryUncertain: true, deliveryDegraded: true }));
+    }
+  }};
+  await assert.rejects(
+    processLiveChange(sock, reading(13, Date.now() - 1000)),
+    /manual recovery required/i
+  );
+  assert.equal(attempts, 1, 'only the first fake recipient was contacted');
+  assert.equal(getState().deliveryUncertain, true, 'later events must preserve quarantine');
+});
+
 test('a replaced symlink marker fails closed before processing new alerts', async () => {
   fs.unlinkSync(marker);
   const target = path.join(dir, 'marker-target');
