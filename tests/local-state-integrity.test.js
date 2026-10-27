@@ -53,16 +53,22 @@ test('corrupt persisted alert state must not initialize a false replacement stat
 test('a failed temporary write preserves the last complete state file', () => {
   store.saveState(validState);
   const oldWrite = fs.writeFileSync;
+  let attempted = false;
   try {
     fs.writeFileSync = function (...args) {
-      if (String(args[0]).endsWith('state.json.tmp')) {
-        throw new Error('synthetic ENOSPC write failure');
+      if (typeof args[0] === 'number') {
+        attempted = true;
+        const error = new Error('synthetic ENOSPC write failure with private bytes');
+        error.code = 'ENOSPC';
+        throw error;
       }
       return oldWrite.apply(this, args);
     };
-    assert.throws(() => store.saveState({ ...validState, level: 'SAFE' }), /synthetic ENOSPC/);
+    assert.throws(() => store.saveState({ ...validState, level: 'SAFE' }),
+      /FloodGuard local write failed/);
   } finally {
     fs.writeFileSync = oldWrite;
   }
+  assert.equal(attempted, true, 'fault injected on the actual staging descriptor');
   assert.deepEqual(store.getState(), validState);
 });
