@@ -194,6 +194,10 @@ function deliveryNotice() {
     if (health.status==='NOT_INITIALIZED') {
       return '\n\n⚠️ *ALERT DELIVERY STATUS UNKNOWN*\nNo verified alert-state baseline has been recorded. Do not rely on automatic delivery; use a manual warning and ask the operator to inspect local state.';
     }
+    // A previously enrolled subscriber list might have disappeared while the
+    // water-state record still looks normal. Never announce quiet delivery
+    // health without verifying the local recipient registry is accessible.
+    getSubscribers();
     return '';
   } catch {
     return '\n\n⚠️ *ALERT DELIVERY STATUS UNKNOWN*\nAutomatic warning delivery cannot be verified. Use a manual warning and ask the operator to inspect the private state.';
