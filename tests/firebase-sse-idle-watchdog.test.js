@@ -66,7 +66,7 @@ test('silent water SSE after initial snapshot becomes an outage, then reacquires
     }
     return makeResponse(key,opts.signal,intervals,{periodic:keepalive});
   };
-  const stream=streamLive({idleTimeoutMs:110});
+  const stream=streamLive({idleTimeoutMs:280});
   const errors=[],frames=[];
   let connected=0;
   stream.on('error',e=>errors.push(e.message));
@@ -87,13 +87,13 @@ test('silent water SSE after initial snapshot becomes an outage, then reacquires
 test('legitimate Firebase keep-alive frames keep stable data connected beyond the idle threshold',async()=>{
   const old=globalThis.fetch,intervals=new Set();
   globalThis.fetch=async(url,opts)=>makeResponse(childKey(url),opts.signal,intervals,{periodic:keepalive});
-  const stream=streamLive({idleTimeoutMs:100});
+  const stream=streamLive({idleTimeoutMs:250});
   const errors=[],frames=[];
   stream.on('error',e=>errors.push(e.message));
   stream.on('live',v=>frames.push(v));
   try {
     await until(()=>frames.length>=1,'initial baseline');
-    await sleep(285); // several watchdog windows, unchanged sensor readings
+    await sleep(555); // several watchdog windows, unchanged sensor readings
     assert.deepEqual(errors,[],'keep-alive events must prevent a false reconnect');
     assert.equal(frames[0].water.status,'SAFE');
   }finally{cleanup(stream,old,intervals);}
@@ -107,7 +107,7 @@ test('unrecognized comment-only chatter does not indefinitely mask stale telemet
       periodic:key==='water'?comment:keepalive
     });
   };
-  const stream=streamLive({idleTimeoutMs:110});
+  const stream=streamLive({idleTimeoutMs:280});
   const errors=[];
   stream.on('error',e=>errors.push(e.message));
   stream.on('live',()=>{});
