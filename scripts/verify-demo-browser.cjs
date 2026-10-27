@@ -208,6 +208,45 @@ function cdpsocket(url) {
       "computedTop:getComputedStyle(s).top,rectY:s.getBoundingClientRect().y};})()");
     assert.ok(skip.active && skip.matched && parseFloat(skip.computedTop)>=0,
       'keyboard skip navigation not visible: '+JSON.stringify(skip));
+    // Inspect Chrome's computed accessibility tree, not merely DOM attributes.
+    // Browser accessibility roles/names reflect what assistive tech can query.
+    await cdp.call('Accessibility.enable');
+    const ax=await cdp.call('Accessibility.getFullAXTree');
+    const controls=ax.nodes.filter(node=>
+      !node.ignored && ['button','checkbox','combobox','link'].includes(node.role?.value));
+    const unnamed=controls.filter(node=>!String(node.name?.value||'').trim());
+    assert.ok(controls.length>=16,'too few accessible interactive controls in browser AX tree');
+    assert.deepEqual(unnamed.map(node=>({role:node.role?.value,id:node.nodeId})),[],
+      'every active button, checkbox, combo box and link needs an accessible name');
+    assert.ok(ax.nodes.some(node=>!node.ignored&&node.role?.value==='main'),
+      'main landmark missing from accessibility tree');
+    assert.ok(ax.nodes.some(node=>!node.ignored&&node.role?.value==='heading'&&
+      String(node.name?.value||'').includes('Offline FloodGuard Preview')),
+      'browser heading name missing');
+
+    // Exercise a keyboard Enter activation in a real browser, not .click().
+    await evaluate("document.querySelector('[data-command=water]').focus();true");
+    assert.equal(await evaluate("document.activeElement.dataset.command==='water'"),true);
+    await cdp.call('Input.dispatchKeyEvent',{
+      type:'rawKeyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13
+    });
+    await cdp.call('Input.dispatchKeyEvent',{
+      type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13
+    });
+    await until("document.querySelectorAll('#chatLog .bubble').length===2",
+      'keyboard Enter initiated fictional preview reply');
+    assert.equal(await evaluate("document.querySelector('#chatLog').innerText.toLowerCase().includes('not sent')"),true);
+
+    // Browser-level reduced-motion emulation must turn off smooth scrolling.
+    await cdp.call('Emulation.setEmulatedMedia',{features:[
+      {name:'prefers-reduced-motion',value:'reduce'}
+    ]});
+    const motion=await evaluate("({matches:matchMedia('(prefers-reduced-motion: reduce)').matches,"+
+      "behavior:getComputedStyle(document.documentElement).scrollBehavior})");
+    assert.equal(motion.matches,true,'browser did not enter reduced-motion mode');
+    assert.equal(motion.behavior,'auto','smooth scrolling must be disabled under reduced motion');
+    await cdp.call('Emulation.setEmulatedMedia',{features:[]});
+
     assert.deepEqual(external,[],'Offline preview attempted an external network request');
     console.log('PASS: headless browser loaded synthetic fixtures, commands, checklist, focus and 375/768/1440px layouts.');
     console.log('Scope: Chromium engine in current CI runner, localhost only; real mobile/WhatsApp/Firebase not tested.');
