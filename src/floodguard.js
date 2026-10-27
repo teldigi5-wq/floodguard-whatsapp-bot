@@ -269,18 +269,44 @@ async function commandReply(jid, text, getLive) {
 }
 
 async function sendAll(sock, text) {
+  // A stuck send can hold the serialized transition processor indefinitely.
+  // This only bounds our local wait; it cannot retract a WhatsApp message
+  // already accepted by the transport or cancel remote side effects.
+  const timeoutMs = Number(process.env.FLOODGUARD_SEND_TIMEOUT_MS ?? 5000);
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 25 || timeoutMs > 30000) {
+    throw new Error('Invalid FloodGuard send timeout policy');
+  }
   const subscribers = [...getSubscribers()];
   let failures = 0;
   for (const jid of subscribers) {
+    let timer;
     try {
-      await sock.sendMessage(jid, { text });
-    } catch {
-      failures += 1;
-      // Never put subscriber IDs, thrown URLs or auth tokens into CI/host logs.
-      console.error('FloodGuard alert delivery failed (details redacted)');
+      // Invoke promptly; rejected/synchronous errors have known failure
+      // semantics in this adapter. A timeout is ambiguous and must stop.
+      let pending;
+      try { pending = Promise.resolve(sock.sendMessage(jid, { text })); }
+      catch { pending = Promise.reject(new Error('FloodGuard transport rejected send')); }
+      const timeout = new Promise(resolve => {
+        timer = setTimeout(() => resolve('timed-out'), timeoutMs);
+      });
+      const result = await Promise.race([
+        pending.then(() => 'accepted', () => 'rejected'),
+        timeout
+      ]);
+      if (result === 'timed-out') {
+        console.error('FloodGuard alert send timed out; delivery uncertain (details redacted)');
+        return { failures: failures + 1, uncertain: true };
+      }
+      if (result === 'rejected') {
+        failures += 1;
+        // Never put subscriber IDs, thrown URLs or auth tokens into CI/host logs.
+        console.error('FloodGuard alert delivery failed (details redacted)');
+      }
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
     }
   }
-  return failures;
+  return { failures, uncertain: false };
 }
 
 function opening(live) {
@@ -345,6 +371,18 @@ async function processLiveChangeSerial(sock, live) {
     return;
   }
 
+  // An earlier send may have been accepted remotely despite our timeout.
+  // Keep observing sensor states, but do not dispatch further messages or
+  // silently replay until the operator reviews the durable uncertainty.
+  if (state.deliveryUncertain === true) {
+    saveState({
+      ...state, lastObservedLevel: currentLevel, lastSeenAt: Date.now(),
+      lastSourceAt: sourceAt ?? state.lastSourceAt, dataStale: false,
+      deliveryDegraded: true
+    });
+    return;
+  }
+
   if (!state.initialized) {
     saveState({
       ...state,
@@ -364,7 +402,24 @@ async function processLiveChangeSerial(sock, live) {
   // confirmation that a remote device received earlier messages.
   let failedSends = 0;
   const sendAlert = async text => {
-    failedSends += await sendAll(sock, text);
+    const outcome = await sendAll(sock, text);
+    failedSends += outcome.failures;
+    if (outcome.uncertain) {
+      const failedAt = Date.now();
+      saveState({
+        ...state, initialized: true, level: currentLevel,
+        gateStatus: currentGate, lastObservedLevel: currentLevel,
+        lastSeenAt: failedAt, lastSourceAt: sourceAt, dataStale: false,
+        alertSendFailureCount:
+          (Number.isSafeInteger(state.alertSendFailureCount) &&
+           state.alertSendFailureCount >= 0 ? state.alertSendFailureCount : 0) +
+          failedSends,
+        deliveryUncertain: true, deliveryDegraded: true,
+        lastDeliveryFailureAt: failedAt
+      });
+      // Do not continue later recipients/events after an ambiguous outcome.
+      throw new Error('FloodGuard delivery outcome uncertain; manual recovery required');
+    }
   };
 
   const previousLevel = state.level || 'UNKNOWN';
