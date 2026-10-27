@@ -51,20 +51,18 @@ test('a child with stalled HTTP handshake times out with redacted error and can 
   const errors=[],snapshots=[];
   stream.on('error',e=>errors.push(e.message));
   stream.on('live',live=>snapshots.push(live));
-  const t=deadline(2500,'initial HTTP handshake timeout');
   try {
-    await Promise.race([
-      (async()=>{
-        while(!errors.length) await new Promise(resolve=>setTimeout(resolve,10));
-      })(),t.promise
-    ]);
+    const end=Date.now()+1800;
+    while(!errors.length && Date.now()<end)
+      await new Promise(resolve=>setTimeout(resolve,10));
+    assert.ok(errors.length,'synthetic handshake never timed out');
     assert.match(errors[0],/initial snapshot timed out/i);
     assert.doesNotMatch(errors.join('\n'),/auth=|private-token/);
     assert.equal(waterAttempts,1);
     assert.deepEqual(new Set(optionsSeen), new Set(CHANNELS.map(([key])=>key)));
     assert.equal(snapshots.length,0,'partial composite must not be published');
   } finally {
-    t.clear();stream.stop();globalThis.fetch=previous;
+    stream.stop();globalThis.fetch=previous;
   }
 });
 
@@ -75,14 +73,14 @@ test('a connected HTTP stream with only partial PATCH never satisfies initial sn
   const errors=[],snapshots=[];
   stream.on('error',e=>errors.push(e.message));
   stream.on('live',live=>snapshots.push(live));
-  const t=deadline(1500,'missing initial root PUT');
   try {
-    await Promise.race([(async()=>{
-      while(!errors.length) await new Promise(resolve=>setTimeout(resolve,10));
-    })(),t.promise]);
+    const end=Date.now()+1200;
+    while(!errors.length && Date.now()<end)
+      await new Promise(resolve=>setTimeout(resolve,10));
+    assert.ok(errors.length,'synthetic partial SSE never timed out');
     assert.match(errors[0],/initial snapshot timed out/i);
     assert.equal(snapshots.length,0);
-  } finally {t.clear();stream.stop();globalThis.fetch=previous;}
+  } finally {stream.stop();globalThis.fetch=previous;}
 });
 
 test('fresh root PUT cancels initial deadline and retains healthy long-running SSE',async()=>{
