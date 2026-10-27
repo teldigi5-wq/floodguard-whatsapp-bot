@@ -20,6 +20,14 @@ The virtual drain checks exclusive ownership and the latest accepted field obser
 
 An exclusive owner's `close()` refuses to release the lock while a drain is active. If ownership is lost during a slow send (for example, a manual operator removes the lock), the original worker fails before persisting further results or sending subsequent jobs. These are virtual safety gates, **not guarantees of actual delivery or cancellation once a remote send has begun**.
 
+## Private-storage failure quarantine
+
+Synthetic filesystem fault injection now covers a partially written private outbox record (ENOSPC), failed file synchronization (EIO), denied same-directory rename (EROFS) and refused creation of the staging file. The previous successfully committed JSON remains authoritative; a failed write attempts to remove its unique, owner-only staging file and reports only a fixed non-sensitive error.
+
+After a persistence failure, the current virtual outbox instance enters a **sticky storage-fault state**. It refuses `observe()`, `enqueue()`, `drain()`, `summary()` and normal owner `close()`, rather than sending any warning from mutated but uncommitted memory. When exclusive ownership was in effect, the lock deliberately remains in place to prevent a second process from automatically replaying an uncertain job. An operator must separately inspect the canonical record and private backups, confirm no process is still running, and explicitly approve recovery. No automatic lock stealing, replacement by a missing/corrupt file, or retry is performed.
+
+These tests do not establish power-loss-safe directory sync, operating-system durability certification or human receipt of alerts. The outbox is still disconnected from live WhatsApp.
+
 ## Explicit limitations before live integration
 
 1. **Not production-wired.** Real flood alerts continue through the existing path. An operator must separately approve any real integration after additional CI and staged acceptance.
