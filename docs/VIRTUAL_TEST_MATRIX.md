@@ -114,7 +114,7 @@ A deliberately **read-only** command, `npm run recovery:inspect`, inspects only 
 
 ## Missing alert-state fail-closed tests (2026-10-27)
 
-The active CommonJS store refuses missing/symlinked canonical alert state instead of fabricating a fresh initialized baseline. A separate private `state.ever-recorded` marker blocks silent recreation after deletion, including an in-flight fake send. An explicit offline bootstrap is limited to operator-acknowledged empty directories; it is not a recovery path. An old canonical state without a marker can be migrated on a subsequent authorized write.
+The active CommonJS store refuses missing/symlinked canonical alert state instead of fabricating a fresh initialized baseline. A separate private `state.ever-recorded` marker blocks silent recreation after deletion, including an in-flight fake send. An explicit offline bootstrap is limited to operator-acknowledged empty directories; it is not a recovery path. An old canonical state without a marker receives the marker at the first trusted read, before any new automatic send.
 
 The synthetic tests cover process restart, deletion during send, missing and corrupt state, marker preservation, legacy migration and bootstrap refusal on reused paths. Existing synthetic first-snapshot tests explicitly initialize fixtures. Nothing here verifies filesystem power-loss guarantees, delivery receipts, Firebase authorization, production host integrity or physical safety.
 
