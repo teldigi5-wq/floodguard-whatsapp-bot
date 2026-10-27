@@ -129,6 +129,8 @@ FLOODGUARD_SETUP_TOKEN=REPLACE_WITH_LONG_PRIVATE_TOKEN
 
 Never commit environment secrets, WhatsApp linked-device files, Firebase credentials or subscriber identifiers. Use a private writable data directory.
 
+**State safety prerequisite:** Fresh installations require explicit offline initialization with `npm run state:bootstrap -- --acknowledge-new-installation` in an existing empty, private, absolute `DATA_PATH`. Do not use it to repair missing or corrupt prior state; preserve backups and escalate for operator review. See [delivery recovery](docs/DELIVERY_UNCERTAINTY_RECOVERY.md).
+
 To start on a correctly configured local/host machine:
 
 ~~~bash
