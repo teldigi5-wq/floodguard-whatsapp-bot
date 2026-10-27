@@ -27,6 +27,16 @@ The bootstrap command requires the exact acknowledgment flag and an empty, exist
 
 These local checks are not tamper-proof against a host administrator or attacker able to replace all private files; `fsync` alone does not guarantee sudden-power-loss durability. They cannot prove actual WhatsApp receipt or a safe water level.
 
+## Missing subscriber list — delivery failure boundary
+
+The recipient enrollment list is also safety-relevant. On its first successful enrollment write, the bot records a separate, private `subscribers.ever-recorded` marker. Existing valid legacy `subscribers.json` files receive a marker before the next trusted read. An installation that has never enrolled anyone may have no subscribers file; **after enrollment has been recorded, a missing/symlinked file must not be treated as an empty list**.
+
+Automatic alert dispatch revalidates the canonical subscriber file and the presence of each recipient before the next send. If an authorized person unsubscribes during a batch, later pending recipients are checked against the updated list; if the list disappears or becomes invalid, the batch fails closed without contacting the next recipient. A final check also detects loss on the last send. A request already started cannot be cancelled, and this mechanism cannot prove recipient receipt.
+
+**Manual incident response:** preserve private backups, recipient consent evidence, source revision and operator notes without publishing identifiers. Use the independent warning process for suspected hazards; do not delete the marker, create an empty replacement list, re-enroll users from guesswork, or replay previous warnings automatically. Restoration and any safe re-enrollment require separate owner authorization and field acceptance.
+
+The two markers protect against ordinary unexpected file loss on a trusted host, not malicious host administrators, all-files rollback, power-loss durability gaps or compromised disks. The synthetic tests have no live accounts, network services or physical hardware.
+
 ## Offline inspection (read-only)
 
 From the project checkout on the operator's authorized machine, with the **existing private** `DATA_PATH` configured:
