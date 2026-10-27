@@ -112,6 +112,20 @@ A deliberately **read-only** command, `npm run recovery:inspect`, inspects only 
 
 **Manual recovery is not implemented:** see `docs/DELIVERY_UNCERTAINTY_RECOVERY.md` for the operator-only warning fallback and required separate authorization. This check cannot verify actual WhatsApp receipt, physical water conditions, RTDB access rules, or host security.
 
+## Missing alert-state fail-closed tests (2026-10-27)
+
+The active CommonJS store refuses missing/symlinked canonical alert state instead of fabricating a fresh initialized baseline. A separate private `state.ever-recorded` marker blocks silent recreation after deletion, including an in-flight fake send. An explicit offline bootstrap is limited to operator-acknowledged empty directories; it is not a recovery path. An old canonical state without a marker receives the marker at the first trusted read, before any new automatic send.
+
+The synthetic tests cover process restart, deletion during send, missing and corrupt state, marker preservation, legacy migration and bootstrap refusal on reused paths. Existing synthetic first-snapshot tests explicitly initialize fixtures. Nothing here verifies filesystem power-loss guarantees, delivery receipts, Firebase authorization, production host integrity or physical safety.
+
+## Combined alert-delivery visibility and state-loss safeguards (2026-10-27)
+
+Draft integration of PRs #62 and #63. The active command replies for menu/help, water, gate, rain, devices, network, unsubscribe and unknown commands now show the existing fixed delivery status when alert delivery is paused, degraded, uninitialized or unreadable. The menu no longer promises delivery just because a subscriber requested enrollment.
+
+The fail-closed canonical-state reader and its owner-only recording marker remain in force during user-facing status checks. Missing or corrupt state produces an explicit UNKNOWN delivery warning; the offline inspector refuses a missing canonical file and never creates a new record. The uninitialized state is separately classified as `NOT_INITIALIZED` requiring manual review.
+
+`tests/alert-health-all-commands.test.js` and `tests/alert-state-loss.test.js` cover fake messages, subprocess restarts, read-only inspection, missing/symlinked state, persisted uncertainty, and operator-only first-install bootstrap. The send loop now re-reads validated canonical state before **each** recipient attempt, preventing an additional fake recipient send after mid-batch state deletion or a newly recorded uncertainty latch. This bounds one class of partial-batch continuation but cannot cancel a send already started. Combined tests must pass both Node.js CI versions before protected review. This does not establish exactly-once delivery, real user receipt, Firebase security, or physical flood safety.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
