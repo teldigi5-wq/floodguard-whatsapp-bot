@@ -22,6 +22,7 @@ The command reads only `DATA_PATH/state.json`. It does not import or launch `bot
 | --- | ---: | --- |
 | `PAUSED_UNCERTAIN_DELIVERY` | 2 | Delivery outcome is ambiguous; automatic alerts are paused and operator review/manual warning are necessary |
 | `DELIVERY_DEGRADED` | 2 | A past send failure was recorded; automatic sends are not necessarily paused, but receipt needs review |
+| `NOT_INITIALIZED` | 2 | No completed alert-state baseline; manual warning/operator review is required, not a healthy-delivery result |
 | `NO_RECORDED_FAILURE` | 0 | No explicit delivery-failure flag recorded. **Not proof of delivery or health** |
 | `INSPECTION_FAILED` | 3 | Missing, malformed, oversized, symlinked or unreadable canonical state. Treat automatic alert health as unknown, never reset state from this check |
 

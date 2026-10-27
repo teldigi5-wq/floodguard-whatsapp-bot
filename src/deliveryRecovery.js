@@ -30,6 +30,14 @@ function assessDeliveryState(state) {
       manualFallbackRequired:true
     };
   }
+  // No completed baseline is not evidence of healthy alert delivery.
+  // Keep explicit uncertainty and degraded flags above this check.
+  if (state.initialized === false) {
+    return {
+      status:'NOT_INITIALIZED',automaticAlertsPaused:null,
+      operatorReviewRequired:true,manualFallbackRequired:true
+    };
+  }
   return {
     status:'NO_RECORDED_FAILURE',
     automaticAlertsPaused:false,
