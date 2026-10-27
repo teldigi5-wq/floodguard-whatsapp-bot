@@ -27,11 +27,17 @@ function childUrl(child) {
 }
 
 async function getChild(child) {
-  const response = await fetch(childUrl(child), {
-    redirect: 'error',
-    signal: AbortSignal.timeout(10000),
-    headers: { 'Cache-Control': 'no-cache' }
-  });
+  let response;
+  try {
+    response = await fetch(childUrl(child), {
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+  } catch {
+    // Fetch exceptions can embed full query-credential URLs. Never expose them.
+    throw new Error('Firebase telemetry request failed (details redacted)');
+  }
   if (!response.ok) throw new Error('Firebase public telemetry HTTP ' + response.status);
   const contentLength = Number(response.headers?.get('content-length') || 0);
   if (Number.isFinite(contentLength) && contentLength > MAX_SNAPSHOT_BYTES)
@@ -42,7 +48,10 @@ async function getChild(child) {
   let total = 0;
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      let packet;
+      try { packet = await reader.read(); }
+      catch { throw new Error('Firebase telemetry response stream failed'); }
+      const { done, value } = packet;
       if (done) break;
       total += value.byteLength;
       if (total > MAX_SNAPSHOT_BYTES) throw new Error('Firebase telemetry response too large');
@@ -52,7 +61,8 @@ async function getChild(child) {
     try { await reader.cancel(); } catch (_) {}
     reader.releaseLock();
   }
-  return JSON.parse(Buffer.concat(parts, total).toString('utf8'));
+  try { return JSON.parse(Buffer.concat(parts, total).toString('utf8')); }
+  catch { throw new Error('Firebase telemetry response invalid JSON'); }
 }
 
 function assemble(values) {
@@ -190,11 +200,17 @@ function streamLive({ initialSnapshotTimeoutMs = 10000, idleTimeoutMs = 120000 }
       }, initialSnapshotTimeoutMs);
       initialWatchdogs.add(initialTimer);
       try {
-        const response = await fetch(childUrl(child), {
-          redirect: 'error',
-          signal: controller.signal,
-          headers: { Accept: 'text/event-stream', 'Cache-Control': 'no-cache' }
-        });
+        let response;
+        try {
+          response = await fetch(childUrl(child), {
+            redirect: 'error',
+            signal: controller.signal,
+            headers: { Accept: 'text/event-stream', 'Cache-Control': 'no-cache' }
+          });
+        } catch {
+          // Never forward raw transport error messages with Firebase auth URL.
+          throw new Error('Firebase telemetry transport failed (details redacted)');
+        }
         if (!response.ok || !response.body) throw new Error('Firebase telemetry stream HTTP ' + response.status);
         retry = 1000;
         const reader = response.body.getReader();
@@ -204,7 +220,10 @@ function streamLive({ initialSnapshotTimeoutMs = 10000, idleTimeoutMs = 120000 }
         // Never merge an initial PATCH with values from a prior connection.
         let hasFreshRootSnapshot = false;
         while (!stopped) {
-          const { done, value } = await reader.read();
+          let packet;
+          try { packet = await reader.read(); }
+          catch { throw new Error('Firebase telemetry response stream failed'); }
+          const { done, value } = packet;
           if (done) break;
           // Normalize after appending so CRLF split across network reads is handled.
           buffer += decoder.decode(value, { stream: true });
@@ -230,7 +249,9 @@ function streamLive({ initialSnapshotTimeoutMs = 10000, idleTimeoutMs = 120000 }
               continue;
             }
             if (eventType !== 'put' && eventType !== 'patch') continue;
-            const payload = JSON.parse(dataLines.join('\n'));
+            let payload;
+            try { payload = JSON.parse(dataLines.join('\n')); }
+            catch { throw new Error('Malformed Firebase telemetry event'); }
             if (!plain(payload) || !Object.hasOwn(payload, 'data')) throw new Error('Malformed Firebase telemetry event');
             if (!hasFreshRootSnapshot) {
               // Firebase RTDB SSE starts with a root PUT. Ignore premature
