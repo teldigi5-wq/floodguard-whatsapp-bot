@@ -1,4 +1,5 @@
 const { getSubscribers, subscribe, unsubscribe, getState, saveState } = require('./store');
+const { assessDeliveryState } = require('./deliveryRecovery');
 
 const STALE_AFTER_MS = Number(process.env.FLOODGUARD_STALE_MS || 15000);
 
@@ -181,8 +182,23 @@ Real-time Flood Monitoring & Dam Gate Alerts
 
 Send *stats* anytime.`;
 
+function deliveryNotice() {
+  try {
+    const health=assessDeliveryState(getState());
+    if (health.automaticAlertsPaused) {
+      return '\n\n🚫 *ALERT DELIVERY PAUSED*\nAutomatic warnings are paused after an uncertain send. Operator review and a manual warning fallback are required. Do not rely on automatic delivery.';
+    }
+    if (health.status==='DELIVERY_DEGRADED') {
+      return '\n\n⚠️ *DELIVERY DEGRADED*\nSome automatic alert attempts failed. Recipient receipt has not been verified; use a manual warning if needed.';
+    }
+    return '';
+  } catch {
+    return '\n\n⚠️ *ALERT DELIVERY STATUS UNKNOWN*\nAutomatic warning delivery cannot be verified. Use a manual warning and ask the operator to inspect the private state.';
+  }
+}
+
 function stats(live) {
-  if (!live) return '⚠️ FloodGuard live data is NOT AVAILABLE.';
+  if (!live) return '⚠️ FloodGuard live data is NOT AVAILABLE.' + deliveryNotice();
   const gate = normalizeGate(live);
   const countdown = Number(live?.gate?.countdownSeconds);
   const gateExtra = !isStale(live) && gate === 'COUNTDOWN' && Number.isFinite(countdown) && countdown > 0
@@ -201,7 +217,7 @@ ${freshnessLine(live)}
 🚨 Alarm: ${boolText(live?.alarm?.active)}
 
 📡 ESP8266: ${normalizeDevice(live?.esp8266?.status || live?.esp8266?.connection)}
-🕒 Last Update: ${ageText(live)}`;
+🕒 Last Update: ${ageText(live)}${deliveryNotice()}`;
 }
 
 async function commandReply(jid, text, getLive) {
@@ -210,7 +226,11 @@ async function commandReply(jid, text, getLive) {
   if (['hi', 'hello', 'hey', 'menu', 'help', 'start'].includes(c)) return menu();
   if (c === 'subscribe') {
     subscribe(jid);
-    return '🔔 *FLOODGUARD ALERTS ENABLED*\n\nYou will receive level changes, gate countdown warnings, gate-open alerts, and recovery notifications.';
+    const notice=deliveryNotice();
+    if (notice.includes('ALERT DELIVERY PAUSED') || notice.includes('STATUS UNKNOWN')) {
+      return '🔔 *FLOODGUARD SUBSCRIPTION RECORDED*\n\nThis does not confirm that automated warning delivery is operating.' + notice;
+    }
+    return '🔔 *FLOODGUARD ALERTS ENABLED*\n\nAlerts are attempted on level changes, gate warnings and recovery; receipt is not guaranteed.' + notice;
   }
   if (c === 'unsubscribe') {
     unsubscribe(jid);
@@ -222,18 +242,18 @@ async function commandReply(jid, text, getLive) {
     live = await getLive();
   } catch (e) {
     // Never send transport errors, private URLs or auth material to WhatsApp.
-    return '⚠️ *FIREBASE NOT AVAILABLE*\n\nTelemetry could not be retrieved. No sensor value has been fabricated.';
+    return '⚠️ *FIREBASE NOT AVAILABLE*\n\nTelemetry could not be retrieved. No sensor value has been fabricated.' + deliveryNotice();
   }
 
   if (['stats', 'status'].includes(c)) return stats(live);
-  if (!live) return '⚠️ FloodGuard live data is NOT AVAILABLE right now.';
+  if (!live) return '⚠️ FloodGuard live data is NOT AVAILABLE right now.' + deliveryNotice();
 
   if (c === 'water') {
     return `💧 *WATER LEVEL*\n\n${freshnessLine(live)}\n💧 Actual Level: ${v(waterLevelCm(live), ' cm')}\n📏 HC-SR04 Air Gap: ${v(live?.water?.distanceCm, ' cm')}\nStatus: *${level(live)}*\n\nRules: SAFE <8.5 cm · WARNING 8.5–<11 cm · DANGER ≥11 cm.`;
   }
 
   if (['risk', 'flood'].includes(c)) {
-    return `🛡️ *FLOOD RISK*\n\n${freshnessLine(live)}\nOverall Risk: *${risk(live)}*\nWater Status: ${level(live)}\nAlarm: ${boolText(live?.alarm?.active)}`;
+    return `🛡️ *FLOOD RISK*\n\n${freshnessLine(live)}\nOverall Risk: *${risk(live)}*\nWater Status: ${level(live)}\nAlarm: ${boolText(live?.alarm?.active)}${deliveryNotice()}`;
   }
 
   if (c === 'gate') {
@@ -262,7 +282,7 @@ async function commandReply(jid, text, getLive) {
   }
 
   if (['emergency', 'alarm'].includes(c)) {
-    return `🚨 *${isStale(live) ? 'LAST RECORDED ALARM STATUS' : 'EMERGENCY STATUS'}*\n\n${freshnessLine(live)}\n\nAlarm: ${boolText(live?.alarm?.active)}\nType: ${v(live?.alarm?.type)}\nRisk: *${risk(live)}*\nWater: *${level(live)}*\nGate: *${normalizeGate(live)}*`;
+    return `🚨 *${isStale(live) ? 'LAST RECORDED ALARM STATUS' : 'EMERGENCY STATUS'}*\n\n${freshnessLine(live)}\n\nAlarm: ${boolText(live?.alarm?.active)}\nType: ${v(live?.alarm?.type)}\nRisk: *${risk(live)}*\nWater: *${level(live)}*\nGate: *${normalizeGate(live)}*${deliveryNotice()}`;
   }
 
   return `❓ Unknown command: *${c || '(empty)'}*\n\nSend *menu* to see FloodGuard commands.`;
