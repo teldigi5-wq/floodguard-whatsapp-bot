@@ -29,6 +29,12 @@ The browser test checks initial disconnected hosting diagnostics, eight fictiona
 
 To rerun in GitHub, open the `FloodGuard Offline Browser E2E` workflow and use **Run workflow** on a branch containing the test, or open a PR that changes relevant offline-demo files. `npm test` remains the separate Node.js unit/integration suite; it does **not** count these browser assertions toward Node's numbered test total.
 
+### Additional real-browser accessibility verification
+
+The CI browser suite also tests a **320px CSS viewport** for reflow/no horizontal overflow, alongside 375px, 768px and 1440px. It inspects Chrome's computed accessibility tree to require accessible names for active links, buttons, checkboxes and combo boxes and checks for a main landmark and a named top-level heading. It focuses a quick command button and verifies a real Chrome Enter-key event produces only a fictional, clearly *not sent* reply. Chrome's `prefers-reduced-motion: reduce` emulation must disable smooth scrolling.
+
+These are focused browser assertions and not an automated WCAG 2.2 AA conformance audit. They do not exercise actual TalkBack, NVDA/VoiceOver, Safari/Firefox, all zoom and text-size combinations, or physical touch behavior.
+
 **Limitations:** This exercises the Chromium engine and a moving Chrome release present on the CI runner—not a pinned browser build, accessibility certification, VoiceOver/TalkBack, Safari/Firefox, or an actual mobile device. It provides a pragmatic automated browser smoke and layout check, not a full WCAG audit. It does not verify real service availability, WhatsApp delivery, network failure, Firebase RTDB permission rules, or the physical flood-warning system.
 
 ## Distinguish demo from real system
