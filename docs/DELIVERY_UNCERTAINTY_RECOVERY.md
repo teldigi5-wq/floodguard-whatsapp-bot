@@ -10,7 +10,7 @@ The active alert-send path has a bounded local wait. If a WhatsApp send does not
 
 ## Missing state and first-install bootstrap
 
-`DATA_PATH/state.json` is safety-critical. Missing canonical state must never be treated as a safe alert-history reset. The service now refuses alert processing without a valid canonical file. An independent owner-only `state.ever-recorded` marker is created before the first state write under this version. If a previously recorded state disappears, that marker prevents silent recreation by normal state writes.
+`DATA_PATH/state.json` is safety-critical. Missing canonical state must never be treated as a safe alert-history reset. The service now refuses alert processing without a valid canonical file. An independent owner-only `state.ever-recorded` marker is created before the first continued alert-state read/write under this version. If a previously recorded state disappears, that marker prevents silent recreation by normal state writes.
 
 **Genuinely new installations only:** after an authorized operator selects a new, empty, absolute local `DATA_PATH`, and *before* starting live service, they may run:
 
