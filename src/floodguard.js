@@ -176,7 +176,7 @@ Real-time Flood Monitoring & Dam Gate Alerts
 🌧️ *rain* — rain-gauge availability
 🚨 *emergency* — alarm summary
 📶 *network* — ESP8266 connection
-🔔 *subscribe* — automatic alerts ON
+🔔 *subscribe* — request alert subscription
 🔕 *unsubscribe* — automatic alerts OFF
 ❓ *help* — show this menu
 
@@ -223,7 +223,7 @@ ${freshnessLine(live)}
 async function commandReply(jid, text, getLive) {
   const c = String(text || '').trim().toLowerCase().split(/\s+/)[0];
 
-  if (['hi', 'hello', 'hey', 'menu', 'help', 'start'].includes(c)) return menu();
+  if (['hi', 'hello', 'hey', 'menu', 'help', 'start'].includes(c)) return menu() + deliveryNotice();
   if (c === 'subscribe') {
     subscribe(jid);
     const notice=deliveryNotice();
@@ -234,7 +234,7 @@ async function commandReply(jid, text, getLive) {
   }
   if (c === 'unsubscribe') {
     unsubscribe(jid);
-    return '🔕 *FLOODGUARD ALERTS DISABLED*\n\nAutomatic FloodGuard alerts have been stopped.';
+    return '🔕 *FLOODGUARD ALERTS DISABLED*\n\nAutomatic FloodGuard alerts have been stopped.' + deliveryNotice();
   }
 
   let live;
@@ -249,7 +249,7 @@ async function commandReply(jid, text, getLive) {
   if (!live) return '⚠️ FloodGuard live data is NOT AVAILABLE right now.' + deliveryNotice();
 
   if (c === 'water') {
-    return `💧 *WATER LEVEL*\n\n${freshnessLine(live)}\n💧 Actual Level: ${v(waterLevelCm(live), ' cm')}\n📏 HC-SR04 Air Gap: ${v(live?.water?.distanceCm, ' cm')}\nStatus: *${level(live)}*\n\nRules: SAFE <8.5 cm · WARNING 8.5–<11 cm · DANGER ≥11 cm.`;
+    return `💧 *WATER LEVEL*\n\n${freshnessLine(live)}\n💧 Actual Level: ${v(waterLevelCm(live), ' cm')}\n📏 HC-SR04 Air Gap: ${v(live?.water?.distanceCm, ' cm')}\nStatus: *${level(live)}*\n\nRules: SAFE <8.5 cm · WARNING 8.5–<11 cm · DANGER ≥11 cm.${deliveryNotice()}`;
   }
 
   if (['risk', 'flood'].includes(c)) {
@@ -259,33 +259,33 @@ async function commandReply(jid, text, getLive) {
   if (c === 'gate') {
     const g = normalizeGate(live);
     const cd = Number(live?.gate?.countdownSeconds);
-    return `🚧 *DAM GATE*\n\nStatus: *${g}*\nAngle: ${v(live?.gate?.angle, '°')}\nCountdown: ${isStale(live) ? 'NOT LIVE (stored countdown)' : g === 'COUNTDOWN' && Number.isFinite(cd) && cd > 0 ? `${cd} seconds` : 'NOT ACTIVE'}\nReason: ${v(live?.gate?.reason)}\n\n${freshnessLine(live)}`;
+    return `🚧 *DAM GATE*\n\nStatus: *${g}*\nAngle: ${v(live?.gate?.angle, '°')}\nCountdown: ${isStale(live) ? 'NOT LIVE (stored countdown)' : g === 'COUNTDOWN' && Number.isFinite(cd) && cd > 0 ? `${cd} seconds` : 'NOT ACTIVE'}\nReason: ${v(live?.gate?.reason)}\n\n${freshnessLine(live)}${deliveryNotice()}`;
   }
 
   if (['rain', 'rainfall'].includes(c)) {
     if (!rainInstalled(live)) {
-      return `🌧️ *RAINFALL*\n\n${freshnessLine(live)}\n\nRain Gauge: *${normalizeDevice(live?.devices?.rainGauge)}*\n\nReal collector sensor data is currently unavailable. No rainfall value is fabricated.`;
+      return `🌧️ *RAINFALL*\n\n${freshnessLine(live)}\n\nRain Gauge: *${normalizeDevice(live?.devices?.rainGauge)}*\n\nReal collector sensor data is currently unavailable. No rainfall value is fabricated.${deliveryNotice()}`;
     }
     const depth = live?.rain?.waterDepthCm;
     const raw = live?.rain?.rawValue;
     const limited = live?.rain?.calibrationLimited === true;
     const weight = live?.rain?.weightGrams;
-    return `🌧️ *RAINFALL*\n\nCurrent: ${v(live?.rain?.currentMm, ' mm')}\nAccumulated: ${v(live?.rain?.dailyMm, ' mm')}\nCategory: ${v(live?.rain?.status)}\nCollector depth: ${v(depth, ' cm')}\nSensor RAW: ${v(raw)}\nGauge weight: ${weight == null ? 'Unavailable (no load cell)' : v(weight, ' g')}\nCalibration: ${limited ? 'LIMITED - highest calibrated depth reached' : 'OK'}\n\n${freshnessLine(live)}`;
+    return `🌧️ *RAINFALL*\n\nCurrent: ${v(live?.rain?.currentMm, ' mm')}\nAccumulated: ${v(live?.rain?.dailyMm, ' mm')}\nCategory: ${v(live?.rain?.status)}\nCollector depth: ${v(depth, ' cm')}\nSensor RAW: ${v(raw)}\nGauge weight: ${weight == null ? 'Unavailable (no load cell)' : v(weight, ' g')}\nCalibration: ${limited ? 'LIMITED - highest calibrated depth reached' : 'OK'}\n\n${freshnessLine(live)}${deliveryNotice()}`;
   }
 
   if (['devices', 'health'].includes(c)) {
-    return `🔧 *${isStale(live) ? 'LAST REPORTED DEVICE HEALTH' : 'DEVICE HEALTH'}*\n\n${freshnessLine(live)}\n\n${deviceLines(live)}\n\n💾 MicroSD: NOT INSTALLED\n📱 GSM: NOT INSTALLED`;
+    return `🔧 *${isStale(live) ? 'LAST REPORTED DEVICE HEALTH' : 'DEVICE HEALTH'}*\n\n${freshnessLine(live)}\n\n${deviceLines(live)}\n\n💾 MicroSD: NOT INSTALLED\n📱 GSM: NOT INSTALLED${deliveryNotice()}`;
   }
 
   if (['network', 'esp', 'wifi'].includes(c)) {
-    return `📶 *ESP8266 NETWORK*\n\nStatus: ${normalizeDevice(live?.esp8266?.status)}\nConnection: ${v(live?.esp8266?.connection)}\nSignal: ${v(live?.esp8266?.rssi, ' dBm')}\n\n${freshnessLine(live)}`;
+    return `📶 *ESP8266 NETWORK*\n\nStatus: ${normalizeDevice(live?.esp8266?.status)}\nConnection: ${v(live?.esp8266?.connection)}\nSignal: ${v(live?.esp8266?.rssi, ' dBm')}\n\n${freshnessLine(live)}${deliveryNotice()}`;
   }
 
   if (['emergency', 'alarm'].includes(c)) {
     return `🚨 *${isStale(live) ? 'LAST RECORDED ALARM STATUS' : 'EMERGENCY STATUS'}*\n\n${freshnessLine(live)}\n\nAlarm: ${boolText(live?.alarm?.active)}\nType: ${v(live?.alarm?.type)}\nRisk: *${risk(live)}*\nWater: *${level(live)}*\nGate: *${normalizeGate(live)}*${deliveryNotice()}`;
   }
 
-  return `❓ Unknown command: *${c || '(empty)'}*\n\nSend *menu* to see FloodGuard commands.`;
+  return `❓ Unknown command: *${c || '(empty)'}*\n\nSend *menu* to see FloodGuard commands.${deliveryNotice()}`;
 }
 
 async function sendAll(sock, text) {
