@@ -86,6 +86,12 @@ The private subscriber list is limited to **512 entries**, and a JSON subscriber
 
 `tests/subscriber-store-validation.test.js` exercises fake individual/LID/group JIDs, malicious malformed destinations, persisted corrupt entries, full and oversized subscriber lists, failure privacy, existing state preservation and idempotent enrollment. Only synthetic test recipients are used. **Operational caveat:** existing legacy subscriber records using unusual identifiers may need operator-controlled review and migration; they are deliberately not accepted automatically. Full installation/real-account tests remain separate.
 
+## Private Firebase transport-error redaction (2026-10-27)
+
+The active REST/SSE client no longer exports **raw rejected fetch errors**, **failed body-reader exceptions**, or **untrusted JSON syntax messages** to calling code. Those error sources can contain entire Firebase query URLs, including a configured `auth` credential, or excerpts of otherwise private telemetry. They are replaced by fixed non-sensitive diagnostics (`Firebase telemetry request failed`, `Firebase telemetry transport failed`, `Firebase telemetry response stream failed`, `Firebase telemetry response invalid JSON` and `Malformed Firebase telemetry event`). Deliberately constructed, bounded HTTP status diagnostics, source authorization-revoked status and existing explicit liveness errors retain their distinct categories.
+
+Offline tests inject fictional credential-bearing URLs into both REST `fetch` and stream failures and into SSE `fetch` and reader failures after a root snapshot. Tests verify no private URL/token reaches callers or emitted `error` events. These are **synthetic transport checks**, not proof that all production SDKs, upstream proxies, log aggregators or WhatsApp dependencies are free of secret leakage. Real credentials and production Firebase were not accessed.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
