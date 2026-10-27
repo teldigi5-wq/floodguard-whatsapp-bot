@@ -112,6 +112,12 @@ A deliberately **read-only** command, `npm run recovery:inspect`, inspects only 
 
 **Manual recovery is not implemented:** see `docs/DELIVERY_UNCERTAINTY_RECOVERY.md` for the operator-only warning fallback and required separate authorization. This check cannot verify actual WhatsApp receipt, physical water conditions, RTDB access rules, or host security.
 
+## Missing alert-state fail-closed tests (2026-10-27)
+
+The active CommonJS store refuses missing/symlinked canonical alert state instead of fabricating a fresh initialized baseline. A separate private `state.ever-recorded` marker blocks silent recreation after deletion, including an in-flight fake send. An explicit offline bootstrap is limited to operator-acknowledged empty directories; it is not a recovery path. An old canonical state without a marker can be migrated on a subsequent authorized write.
+
+The synthetic tests cover process restart, deletion during send, missing and corrupt state, marker preservation, legacy migration and bootstrap refusal on reused paths. Existing synthetic first-snapshot tests explicitly initialize fixtures. Nothing here verifies filesystem power-loss guarantees, delivery receipts, Firebase authorization, production host integrity or physical safety.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
