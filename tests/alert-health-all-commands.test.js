@@ -107,3 +107,30 @@ test('missing alert-state record does not produce a falsely healthy menu', async
   assert.match(reply, /manual warning/i);
   assert.equal(fs.existsSync(stateFile), false, 'inspection may not bootstrap state');
 });
+
+
+test('integrated state-loss guard and user warnings remain safe after a missing canonical file', async () => {
+  // Prior test removed the canonical alert state; the independent marker must
+  // continue preventing accidental recreation and false healthy responses.
+  assert.equal(fs.existsSync(stateFile), false);
+  for (const cmd of ['menu', 'water', 'risk', 'gate', 'rain', 'devices', 'network', 'emergency']) {
+    const reply = await commandReply(jid, cmd, live);
+    assert.match(reply, /ALERT DELIVERY STATUS UNKNOWN/, cmd);
+    assert.match(reply, /manual warning/i, cmd);
+    assert.doesNotMatch(reply, /ALERTS ENABLED/, cmd);
+  }
+  assert.throws(() => saveState(state({
+    deliveryUncertain: false, deliveryDegraded: false
+  })), /manual recovery required/i,
+  'an ordinary write cannot recreate missing canonical state');
+  const { spawnSync } = require('node:child_process');
+  const inspector = path.resolve(__dirname, '../scripts/inspect-delivery-recovery.js');
+  const report = spawnSync(process.execPath, [inspector], {
+    encoding: 'utf8', timeout: 1800,
+    env: { ...process.env, DATA_PATH: dir }
+  });
+  assert.equal(report.status, 3);
+  assert.equal(JSON.parse(report.stdout).status, 'INSPECTION_FAILED');
+  assert.equal(report.stderr, '');
+  assert.equal(fs.existsSync(stateFile), false, 'neither command nor inspector may recreate state');
+});
