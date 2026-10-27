@@ -95,8 +95,15 @@ function ensureStateRecordedMarker() {
 // An absent file is permitted ONLY before any enrollment has been persisted.
 const SUBSCRIBER_MARKER = file('subscribers.ever-recorded');
 function ensureSubscribersRecordedMarker(forInitialWrite = false) {
-  const canonicalExists = privateRegularFileStatus(file('subscribers.json'));
-  const markerExists = privateRegularFileStatus(SUBSCRIBER_MARKER);
+  let canonicalExists, markerExists;
+  try {
+    canonicalExists = privateRegularFileStatus(file('subscribers.json'));
+    markerExists = privateRegularFileStatus(SUBSCRIBER_MARKER);
+  } catch {
+    // Keep private filesystem errors redacted while identifying which
+    // durable record needs an operator's consent-safe restoration.
+    throw new Error('FloodGuard subscriber private record unavailable; manual recovery required.');
+  }
   if (!canonicalExists && markerExists) {
     throw new Error('FloodGuard subscriber store missing after previous recording; manual recovery required.');
   }
