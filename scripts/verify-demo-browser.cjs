@@ -183,7 +183,7 @@ function cdpsocket(url) {
     assert.equal(await evaluate("document.querySelector('#acceptanceStatus').textContent.startsWith('0 of 5')"),true);
 
     // Distinct actual browser viewport sizes: responsive layout and touch target visibility.
-    for(const width of [375,768,1440]){
+    for(const width of [320,375,768,1440]){
       await cdp.call('Emulation.setDeviceMetricsOverride',{
         width,height:900,deviceScaleFactor:1,mobile:false
       });
@@ -250,7 +250,7 @@ function cdpsocket(url) {
     await cdp.call('Emulation.setEmulatedMedia',{features:[]});
 
     assert.deepEqual(external,[],'Offline preview attempted an external network request');
-    console.log('PASS: headless browser loaded synthetic fixtures, commands, checklist, focus and 375/768/1440px layouts.');
+    console.log('PASS: headless browser loaded synthetic fixtures, commands, checklist, focus, a11y, keyboard, reduced motion and 320/375/768/1440px layouts.');
     console.log('Scope: Chromium engine in current CI runner, localhost only; real mobile/WhatsApp/Firebase not tested.');
   } finally {
     try{cdp?.close();}catch{}
