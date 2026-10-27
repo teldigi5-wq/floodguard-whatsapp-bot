@@ -5,13 +5,14 @@
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
-    "check": "node --check bot.js && node --check src/firebase.js && node --check src/floodguard.js && node --check src/store.js && node --check src/webUi.js && node --check src/adminAccess.js && node --check src/deliveryRecovery.js && node --check scripts/inspect-delivery-recovery.js && node --check scripts/bootstrap-alert-state.js",
+    "check": "node --check bot.js && node --check src/firebase.js && node --check src/floodguard.js && node --check src/store.js && node --check src/webUi.js && node --check src/adminAccess.js && node --check src/deliveryRecovery.js && node --check scripts/inspect-delivery-recovery.js && node --check scripts/bootstrap-alert-state.js && node --check scripts/inspect-subscriber-registry.js",
     "test": "node --test tests/*.test.js",
     "start:demo": "node scripts/start-demo.js",
     "doctor": "node scripts/doctor.js",
     "test:coverage": "node --experimental-test-coverage --test tests/*.test.js",
     "recovery:inspect": "node scripts/inspect-delivery-recovery.js",
-    "state:bootstrap": "node scripts/bootstrap-alert-state.js"
+    "state:bootstrap": "node scripts/bootstrap-alert-state.js",
+    "subscribers:inspect": "node scripts/inspect-subscriber-registry.js"
   },
   "engines": {
     "node": ">=20.0.0"
