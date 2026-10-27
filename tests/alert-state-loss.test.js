@@ -159,6 +159,25 @@ test('a symlinked canonical state is refused without reading its target', () => 
   fs.writeFileSync(canonical, JSON.stringify(state()), { mode: 0o600 });
 });
 
+test('losing state during a multi-recipient send blocks remaining fake recipients', async () => {
+  saveState(state());
+  subscribe('synthetic-second@s.whatsapp.net');
+  let attempts = 0;
+  const sock = { sendMessage: async () => {
+    attempts++;
+    if (attempts === 1) fs.unlinkSync(canonical);
+  }};
+  await assert.rejects(
+    processLiveChange(sock, reading(13, Date.now() - 1000)),
+    /manual.*recovery/i
+  );
+  assert.equal(attempts, 1, 'no later recipient may be contacted after state loss');
+  assert.equal(fs.existsSync(canonical), false);
+  // Deliberately reconstruct ONLY the isolated fake fixture for the following
+  // test; no recovery or state restoration is performed by production code.
+  fs.writeFileSync(canonical, JSON.stringify(state()), { mode: 0o600 });
+});
+
 test('a replaced symlink marker fails closed before processing new alerts', async () => {
   fs.unlinkSync(marker);
   const target = path.join(dir, 'marker-target');
