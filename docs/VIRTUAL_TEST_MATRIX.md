@@ -66,6 +66,12 @@ The shared loopback-only Basic-auth guard now limits failed credentials across i
 
 Deterministic offline tests inject a private synthetic token, short test limits, and a fake clock to exercise lockout, expiry, authorized recovery and forwarded-header spoofing. Node CI and the offline Chromium workflow verify that existing routes remain functional. This is **not** a distributed, persistent or internet-facing rate limiter; process restart clears counters, and excessive bad requests can temporarily deny access to the legitimate operator. The administrative service must remain on loopback behind an operator-approved tunnel/TLS boundary. No live host or account was tested.
 
+## Local private-storage failure injection (2026-10-27)
+
+The active CommonJS `src/store.js` now stages changes to subscriber and alert-state JSON through an **exclusive, unpredictable per-write temporary file**, with owner-only `0600` mode, `fsync` of the staged file and an atomic same-directory rename. Failures before replacement attempt to close and remove the staged temporary record, preserve the last canonical file and return a **fixed, non-sensitive diagnostic** rather than raw OS path/secret-bearing errors. Newly created private directories request owner-only `0700` permissions.
+
+Offline fault-injection tests simulate an attacker-planted legacy `state.json.tmp` symlink, partial ENOSPC writes, EROFS-style rename failures, file-sync errors, abandoned crash temp files and owner-only file permissions. They also simulate an explicit operator-owned backup, deliberate canonical corruption and **manual** backup restoration. The application intentionally does not scan or silently promote abandoned temp files or backups. These are **synthetic tests on GitHub Actions filesystems**, not certified sudden-power-loss durability, automatic crash recovery, Windows filesystem semantics or verified operator backups. Actual disk/host permissions, secure backup storage and rollback still need owner acceptance.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.

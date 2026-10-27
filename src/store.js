@@ -1,11 +1,12 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 
 // Local records may contain subscriber identifiers and alert history.
 // Never log their data, content excerpts, or absolute paths on read failures.
 const DATA_PATH = process.env.DATA_PATH || path.join(process.cwd(), 'data');
-fs.mkdirSync(DATA_PATH, { recursive: true });
+fs.mkdirSync(DATA_PATH, { recursive: true, mode: 0o700 });
 const file = name => path.join(DATA_PATH, name);
 
 function readJson(name, fallback) {
@@ -26,11 +27,34 @@ function readJson(name, fallback) {
 }
 
 function writeJson(name, value) {
-  // The old complete destination stays intact if writing the temporary file
-  // fails (e.g. ENOSPC) before the atomic same-directory rename.
-  const temporary = file(name + '.tmp');
-  fs.writeFileSync(temporary, JSON.stringify(value, null, 2), { mode: 0o600 });
-  fs.renameSync(temporary, file(name));
+  // A unique, exclusive, owner-only staging file avoids collisions and
+  // predictable .tmp symlink attacks. Never use a temp file as a bootstrap
+  // fallback: only a successfully renamed canonical record is authoritative.
+  const temporary = file(name + '.' + randomUUID() + '.tmp');
+  let fd;
+  let staged = false;
+  try {
+    const serialized = JSON.stringify(value, null, 2);
+    fd = fs.openSync(temporary, 'wx', 0o600);
+    staged = true;
+    fs.writeFileSync(fd, serialized, 'utf8');
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+    // Atomic within a supported same-directory filesystem. A sudden power
+    // loss still requires its own device/filesystem-specific recovery tests.
+    fs.renameSync(temporary, file(name));
+  } catch {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
+    if (staged) {
+      try { fs.unlinkSync(temporary); } catch {}
+    }
+    // Never print OS exceptions containing absolute private paths, bytes,
+    // account names or transient secret-bearing filesystem diagnostics.
+    throw new Error('FloodGuard local write failed for ' + name + '; inspect private storage and backup.');
+  }
 }
 
 function getSubscribers() {
