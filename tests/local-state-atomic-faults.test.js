@@ -115,3 +115,28 @@ test('a leftover simulated crash temp never overrides the last complete state',(
     'crash remnants must not be silently treated as canonical state or deleted blindly');
   fs.unlinkSync(abandoned);
 });
+
+
+test('synthetic operator backup and explicit restore recover the original state after corruption',()=>{
+  ready();
+  const backup=pathFor('state.manual-backup.json');
+  fs.copyFileSync(pathFor('state.json'),backup,fs.constants.COPYFILE_EXCL);
+  fs.chmodSync(backup,0o600);
+  fs.writeFileSync(pathFor('state.json'),'{INTENTIONALLY CORRUPT');
+  assert.throws(()=>store.getState(),/Corrupt FloodGuard local state/);
+  // The application must not automatically overwrite or select a backup.
+  assert.equal(fs.readFileSync(pathFor('state.json'),'utf8'),'{INTENTIONALLY CORRUPT');
+  fs.copyFileSync(backup,pathFor('state.json'));
+  assert.deepEqual(store.getState(),oldState);
+  store.saveState(newerState);
+  assert.deepEqual(store.getState(),newerState);
+  fs.unlinkSync(backup);
+});
+
+test('new subscriber records use owner-only permissions and a single canonical file',()=>{
+  store.subscribe('synthetic-recipient@s.whatsapp.net');
+  const saved=pathFor('subscribers.json');
+  assert.equal(fs.statSync(saved).mode & 0o777,0o600);
+  assert.deepEqual([...store.getSubscribers()],['synthetic-recipient@s.whatsapp.net']);
+  assert.deepEqual(fs.readdirSync(dir).filter(s=>/^subscribers\.json\..+\.tmp$/.test(s)),[]);
+});
