@@ -10,6 +10,7 @@ fs.mkdirSync(DATA_PATH, { recursive: true, mode: 0o700 });
 const file = name => path.join(DATA_PATH, name);
 const MAX_SUBSCRIBERS = 512;
 const MAX_SUBSCRIBER_BYTES = 128 * 1024;
+const MAX_STATE_BYTES = 128 * 1024; // Mirror the read-only recovery inspector.
 // Match the supported Baileys chat identities (individual, LID or group).
 // Do not allow newlines/control characters, arbitrary domains or status
 // broadcast identifiers to enter persistent delivery records.
@@ -26,17 +27,22 @@ function requireSubscriberJid(jid) {
 function readJson(name, fallback) {
   let raw;
   try {
-    if (name === 'subscribers.json') {
+    // Bound both canonical records before parsing: runaway private state
+    // growth must not exhaust the active alert process's memory budget.
+    const maxBytes = name === 'subscribers.json' ? MAX_SUBSCRIBER_BYTES :
+      name === 'state.json' ? MAX_STATE_BYTES : null;
+    if (maxBytes !== null) {
       const bytes = fs.statSync(file(name)).size;
-      if (!Number.isSafeInteger(bytes) || bytes > MAX_SUBSCRIBER_BYTES) {
-        throw new Error('Oversized FloodGuard subscriber store');
+      if (!Number.isSafeInteger(bytes) || bytes > maxBytes) {
+        throw new Error('Oversized FloodGuard private JSON record');
       }
     }
     raw = fs.readFileSync(file(name), 'utf8');
   } catch (error) {
     if (error?.code === 'ENOENT') return fallback;
-    if (name === 'subscribers.json' && error?.message === 'Oversized FloodGuard subscriber store') {
-      throw new Error('Invalid FloodGuard subscriber store: oversized private data; manual recovery required.');
+    if (error?.message === 'Oversized FloodGuard private JSON record') {
+      throw new Error('Invalid FloodGuard local ' + name +
+        ': oversized private data; manual recovery required.');
     }
     throw new Error('Unreadable FloodGuard local ' + name + '; inspect the private backup.');
   }
@@ -177,8 +183,11 @@ function getSubscribers() {
   if (existed && data === undefined) {
     throw new Error('FloodGuard subscriber store unavailable after recording; manual recovery required.');
   }
+  // The independent operator inspector rejects duplicates; the active
+  // process must not silently normalize malformed consent records either.
   if (!Array.isArray(data) || data.length > MAX_SUBSCRIBERS ||
-      data.some(jid => !validSubscriberJid(jid))) {
+      data.some(jid => !validSubscriberJid(jid)) ||
+      new Set(data).size !== data.length) {
     throw new Error('Invalid FloodGuard subscriber capacity or recipient; manual private recovery required.');
   }
   return new Set(data);
