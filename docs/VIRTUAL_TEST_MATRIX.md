@@ -118,6 +118,14 @@ The active CommonJS store refuses missing/symlinked canonical alert state instea
 
 The synthetic tests cover process restart, deletion during send, missing and corrupt state, marker preservation, legacy migration and bootstrap refusal on reused paths. Existing synthetic first-snapshot tests explicitly initialize fixtures. Nothing here verifies filesystem power-loss guarantees, delivery receipts, Firebase authorization, production host integrity or physical safety.
 
+## Combined alert-delivery visibility and state-loss safeguards (2026-10-27)
+
+Draft integration of PRs #62 and #63. The active command replies for menu/help, water, gate, rain, devices, network, unsubscribe and unknown commands now show the existing fixed delivery status when alert delivery is paused, degraded, uninitialized or unreadable. The menu no longer promises delivery just because a subscriber requested enrollment.
+
+The fail-closed canonical-state reader and its owner-only recording marker remain in force during user-facing status checks. Missing or corrupt state produces an explicit UNKNOWN delivery warning; the offline inspector refuses a missing canonical file and never creates a new record. The uninitialized state is separately classified as `NOT_INITIALIZED` requiring manual review.
+
+`tests/alert-health-all-commands.test.js` and `tests/alert-state-loss.test.js` cover fake messages, subprocess restarts, read-only inspection, missing/symlinked state, persisted uncertainty, and operator-only first-install bootstrap. Combined tests must pass both Node.js CI versions before protected review. This does not establish exactly-once delivery, real user receipt, Firebase security, or physical flood safety.
+
 ## Remaining virtual tests worth doing next
 
 1. Test corrupted local subscriber/state storage and behavior under read-only/full-disk conditions, including log redaction and reliable recovery.
