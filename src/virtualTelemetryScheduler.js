@@ -1,7 +1,8 @@
 'use strict';
 
 // Isolated, in-memory synthetic telemetry ingress contract.
-// NOT used by bot.js or live Firebase/WhatsApp. No I/O, networking or timers.
+// NOT used by bot.js or live Firebase/WhatsApp. No I/O or networking.
+// A bounded timer exists only while a fake consumer callback is in flight.
 // A full queue is an explicit unrecoverable fault, not a silent drop.
 const PHASES = Object.freeze({
   water: new Set(['SAFE','WARNING','DANGER']),
@@ -13,8 +14,12 @@ const MAX_LEAD_MS = 5000;
 function invalid() { throw Error('Virtual telemetry ingress INVALID observation or configuration'); }
 function fail(code) { throw Error('Virtual telemetry ingress ' + code); }
 
-function createVirtualTelemetryScheduler({capacity=32,now=Date.now,consumer}={}) {
+function createVirtualTelemetryScheduler({
+  capacity=32,now=Date.now,consumer,consumerTimeoutMs=3000
+}={}) {
   if (!Number.isSafeInteger(capacity) || capacity<1 || capacity>256 ||
+      !Number.isSafeInteger(consumerTimeoutMs) ||
+      consumerTimeoutMs<25 || consumerTimeoutMs>10000 ||
       typeof now!=='function' || typeof consumer!=='function') invalid();
 
   const pending=[];
@@ -22,7 +27,7 @@ function createVirtualTelemetryScheduler({capacity=32,now=Date.now,consumer}={})
   let draining=false;
   let fault=null;
   const counters={processed:0,coalesced:0,duplicates:0,older:0,
-    rejectedOverflow:0,expired:0,quarantined:0};
+    rejectedOverflow:0,expired:0,quarantined:0,timedOut:0};
 
   function normalize(value) {
     // Reject arbitrary payloads so account identifiers, secrets or untrusted
@@ -96,12 +101,34 @@ function createVirtualTelemetryScheduler({capacity=32,now=Date.now,consumer}={})
         // observations can queue while this call awaits. Once the callback
         // starts, its side effects are not undoable or guaranteed.
         pending.shift();
+        const controller=new AbortController();
+        const expiredToken=Symbol('timeout');
+        let timer;
+        let result;
         try {
-          await consumer(entry);
+          const deadline=new Promise(resolve=>{
+            timer=setTimeout(()=>resolve(expiredToken),consumerTimeoutMs);
+          });
+          // Invoke the injected fake consumer with best-effort cancellation.
+          // Never reuse a late completion to clear a timeout or fault.
+          result=await Promise.race([
+            Promise.resolve(consumer(entry,{signal:controller.signal})).then(()=>null),
+            deadline
+          ]);
         } catch {
+          controller.abort();
           counters.quarantined++;
           fault='CONSUMER_FAILURE';
-          fail(fault); // Never leak raw exception contents or retry ambiguously.
+          fail(fault); // Never export consumer-supplied errors or retry.
+        } finally {
+          if(timer!==undefined) clearTimeout(timer);
+        }
+        if(result===expiredToken) {
+          controller.abort();
+          counters.quarantined++;
+          counters.timedOut++;
+          fault='CONSUMER_TIMEOUT';
+          fail(fault);
         }
         counters.processed++;
         completed++;
