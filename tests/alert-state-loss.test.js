@@ -76,6 +76,7 @@ test('existing legacy canonical state without a marker can migrate on the next s
   fs.unlinkSync(marker);
   fs.writeFileSync(canonical, JSON.stringify(state({ deliveryUncertain: true })), { mode: 0o600 });
   assert.equal(getState().deliveryUncertain, true);
+  assert.equal(fs.existsSync(marker), true, 'legacy state becomes protected before sending');
   saveState(state({ deliveryUncertain: true, lastSeenAt: 123 }));
   assert.equal(fs.lstatSync(marker).isFile(), true);
   assert.equal(getState().deliveryUncertain, true);
@@ -142,4 +143,34 @@ test('corrupt state is preserved for private operator review', () => {
   const before = fs.readFileSync(canonical);
   assert.throws(() => getState(), /corrupt.*state|corrupt.*local/i);
   assert.deepEqual(fs.readFileSync(canonical), before);
+});
+
+
+test('a symlinked canonical state is refused without reading its target', () => {
+  const target = path.join(dir, 'secret-target.json');
+  fs.writeFileSync(target, JSON.stringify(state({ privateToken: 'synthetic-secret' })));
+  fs.unlinkSync(canonical);
+  fs.symlinkSync(target, canonical);
+  const oldTarget = fs.readFileSync(target);
+  assert.throws(() => getState(), /manual.*recovery|unavailable.*manual/i);
+  assert.throws(() => saveState(state()), /manual.*recovery/i);
+  assert.deepEqual(fs.readFileSync(target), oldTarget);
+  fs.unlinkSync(canonical);
+  fs.writeFileSync(canonical, JSON.stringify(state()), { mode: 0o600 });
+});
+
+test('a replaced symlink marker fails closed before processing new alerts', async () => {
+  fs.unlinkSync(marker);
+  const target = path.join(dir, 'marker-target');
+  fs.writeFileSync(target, 'synthetic-marker-secret');
+  fs.symlinkSync(target, marker);
+  assert.throws(() => getState(), /manual.*recovery/i);
+  let attempted = 0;
+  await assert.rejects(
+    processLiveChange({ sendMessage: async () => { attempted++; } },
+      reading(13, Date.now() - 1000)),
+    /manual.*recovery/i
+  );
+  assert.equal(attempted, 0);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'synthetic-marker-secret');
 });
