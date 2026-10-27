@@ -98,3 +98,48 @@ test('loss during an in-flight fake send prevents recreation and all later sends
   );
   assert.equal(sends, 1, 'no replay or later automatic warning may proceed after loss');
 });
+
+
+test('the offline bootstrap requires explicit acknowledgement and an empty absolute directory', () => {
+  const separate = fs.mkdtempSync(path.join(os.tmpdir(), 'fg-bootstrap-'));
+  const script = path.resolve(__dirname, '../scripts/bootstrap-alert-state.js');
+  const run = (args = [], dataPath = separate) => spawnSync(process.execPath,
+    [script, ...args], {
+      cwd: path.resolve(__dirname, '..'), encoding: 'utf8',
+      timeout: 3000, maxBuffer: 16 * 1024,
+      env: { ...process.env, DATA_PATH: dataPath, TEST_SECRET: 'synthetic-private-token' }
+    });
+  try {
+    for (const args of [[], ['--force'], ['--acknowledge-new-installation', 'extra']]) {
+      const failed = run(args);
+      assert.equal(failed.status, 3);
+      assert.equal(failed.stdout, 'STATE_BOOTSTRAP_REFUSED\n');
+      assert.equal(failed.stderr, '');
+      assert.deepEqual(fs.readdirSync(separate), []);
+    }
+    assert.equal(run(['--acknowledge-new-installation'], 'relative-folder').status, 3);
+    const accepted = run(['--acknowledge-new-installation']);
+    assert.equal(accepted.status, 0);
+    assert.equal(accepted.stdout, 'NEW_INSTALLATION_STATE_INITIALIZED\n');
+    assert.equal(accepted.stderr, '');
+    assert.deepEqual(fs.readdirSync(separate).sort(), ['state.ever-recorded', 'state.json']);
+    const first = JSON.parse(fs.readFileSync(path.join(separate, 'state.json'), 'utf8'));
+    assert.equal(first.initialized, false);
+    assert.equal(first.deliveryUncertain, false);
+    assert.equal(fs.statSync(path.join(separate, 'state.json')).mode & 0o077, 0);
+    assert.equal(run(['--acknowledge-new-installation']).status, 3, 'never reset an existing installation');
+    fs.unlinkSync(path.join(separate, 'state.json'));
+    assert.equal(run(['--acknowledge-new-installation']).status, 3,
+      'missing state plus an independent marker is an incident, not new installation');
+    assert.equal(fs.existsSync(path.join(separate, 'state.json')), false);
+  } finally {
+    fs.rmSync(separate, { recursive: true, force: true });
+  }
+});
+
+test('corrupt state is preserved for private operator review', () => {
+  fs.writeFileSync(canonical, '{"deliveryUncertain":false,"token":"synthetic-secret"');
+  const before = fs.readFileSync(canonical);
+  assert.throws(() => getState(), /corrupt.*state|corrupt.*local/i);
+  assert.deepEqual(fs.readFileSync(canonical), before);
+});
