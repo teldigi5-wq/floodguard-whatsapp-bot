@@ -9,7 +9,7 @@ const os=require('node:os');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'floodguard-offline-'));
 process.env.DATA_PATH=tmp;
 const { isStale, fieldTimeMs, commandReply, processLiveChange }=require('../src/floodguard');
-const { getState }=require('../src/store');
+const { getState, saveState }=require('../src/store');
 test.after(()=>fs.rmSync(tmp,{recursive:true,force:true}));
 const snapshot=(time)=>({
   system:{lastUpdate:time,overallRisk:'HIGH'},
@@ -58,6 +58,8 @@ test('offline WhatsApp commands disclose historical rather than current data',as
 });
 
 test('stale or future-dated snapshots never emit automatic gate or flood alerts',async()=>{
+ // Synthetic initial-state fixture: production boot requires explicit setup.
+ saveState({initialized:false,level:'UNKNOWN',gateStatus:'UNKNOWN',procedureId:null,sentCountdown:[]});
  const sends=[];
  const sock={sendMessage:async(...args)=>{sends.push(args)}};
  await processLiveChange(sock,snapshot(Date.now()-3600000));
