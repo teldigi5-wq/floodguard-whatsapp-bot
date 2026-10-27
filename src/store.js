@@ -49,6 +49,47 @@ function readJson(name, fallback) {
   }
 }
 
+// One-way independent marker: losing the canonical state after any recorded
+// transition is a safety incident, never permission to start a fresh baseline.
+// A missing marker + existing state is supported for migration from older
+// installations. A missing marker + missing state is ONLY for explicit offline
+// bootstrap/tests; processLiveChange always calls getState() first and fails.
+const STATE_MARKER = file('state.ever-recorded');
+function privateRegularFileStatus(filename) {
+  try {
+    const metadata = fs.lstatSync(filename);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) {
+      throw new Error('Invalid private state record');
+    }
+    return true;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw new Error('FloodGuard private state record unavailable; manual recovery required.');
+  }
+}
+function ensureStateRecordedMarker() {
+  const canonicalExists = privateRegularFileStatus(file('state.json'));
+  const markerExists = privateRegularFileStatus(STATE_MARKER);
+  if (!canonicalExists && markerExists) {
+    throw new Error('FloodGuard alert state missing after previous recording; manual recovery required.');
+  }
+  if (!markerExists) {
+    // Before any canonical replacement, persist a small, owner-only marker.
+    // Never delete it automatically, including after failed writes/restarts.
+    let fd;
+    try {
+      fd = fs.openSync(STATE_MARKER, 'wx', 0o600);
+      fs.writeSync(fd, 'floodguard-state-recorded-v1\n');
+      fs.fsyncSync(fd);
+    } catch {
+      throw new Error('FloodGuard private state marker unavailable; manual recovery required.');
+    } finally {
+      if (fd !== undefined) { try { fs.closeSync(fd); } catch {} }
+    }
+  }
+  return canonicalExists;
+}
+
 function writeJson(name, value) {
   // A unique, exclusive, owner-only staging file avoids collisions and
   // predictable .tmp symlink attacks. Never use a temp file as a bootstrap
@@ -57,6 +98,8 @@ function writeJson(name, value) {
   let fd;
   let staged = false;
   try {
+    const priorStateExists = name === 'state.json'
+      ? ensureStateRecordedMarker() : false;
     const serialized = JSON.stringify(value, null, 2);
     fd = fs.openSync(temporary, 'wx', 0o600);
     staged = true;
@@ -66,6 +109,12 @@ function writeJson(name, value) {
     fd = undefined;
     // Atomic within a supported same-directory filesystem. A sudden power
     // loss still requires its own device/filesystem-specific recovery tests.
+    // If another actor removed the canonical state while a send/write was in
+    // flight, never silently recreate it and erase a lost quarantine.
+    if (name === 'state.json' && priorStateExists &&
+        !privateRegularFileStatus(file('state.json'))) {
+      throw new Error('FloodGuard alert state disappeared during write');
+    }
     fs.renameSync(temporary, file(name));
   } catch {
     if (fd !== undefined) {
@@ -76,7 +125,7 @@ function writeJson(name, value) {
     }
     // Never print OS exceptions containing absolute private paths, bytes,
     // account names or transient secret-bearing filesystem diagnostics.
-    throw new Error('FloodGuard local write failed for ' + name + '; inspect private storage and backup.');
+    throw new Error('FloodGuard local write failed for ' + name + '; manual recovery required.');
   }
 }
 
@@ -109,10 +158,15 @@ function unsubscribe(jid) {
 }
 
 function getState() {
-  const state = readJson('state.json', {
-    initialized: false, level: 'UNKNOWN', gateStatus: 'UNKNOWN',
-    procedureId: null, sentCountdown: []
-  });
+  // Never fabricate an empty prior state: doing so could erase a previous
+  // deliveryUncertain latch and permit future automatic warnings/replays.
+  if (!privateRegularFileStatus(file('state.json'))) {
+    throw new Error('Missing FloodGuard alert state; manual recovery required.');
+  }
+  const state = readJson('state.json', undefined);
+  if (state === undefined) {
+    throw new Error('Missing FloodGuard alert state; manual recovery required.');
+  }
   if (!state || typeof state !== 'object' || Array.isArray(state) ||
       typeof state.initialized !== 'boolean' ||
       typeof state.level !== 'string' || typeof state.gateStatus !== 'string' ||
