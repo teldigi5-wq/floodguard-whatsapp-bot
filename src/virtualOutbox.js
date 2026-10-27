@@ -69,15 +69,26 @@ function load(filename) {
 }
 function save(filename, data) {
   const tmp = filename + '.' + randomUUID() + '.tmp';
-  const fd = fs.openSync(tmp, 'wx', 0o600);
+  let fd;
+  let staged = false;
   try {
+    fd = fs.openSync(tmp, 'wx', 0o600);
+    staged = true;
     fs.writeFileSync(fd, JSON.stringify(data));
     fs.fsyncSync(fd);
-  } finally { fs.closeSync(fd); }
-  try { fs.renameSync(tmp, filename); }
-  catch {
-    try { fs.unlinkSync(tmp); } catch {}
-    throw new Error('Offline alert outbox: could not commit private file');
+    fs.closeSync(fd);
+    fd = undefined;
+    fs.renameSync(tmp, filename);
+  } catch {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
+    if (staged) {
+      try { fs.unlinkSync(tmp); } catch {}
+    }
+    // No absolute storage paths, rejected remote errors or private recipient
+    // contents may escape from an injected filesystem failure.
+    throw new Error('Offline alert outbox: private storage failure; operator recovery required');
   }
 }
 
@@ -90,6 +101,7 @@ function createVirtualOutbox({ dataDir, now = Date.now, exclusive = false }) {
   const ownerFile = path.join(dataDir, 'alert-outbox-v1.owner');
   const token = exclusive ? randomUUID() : null;
   let closed = false;
+  let storageFault = false;
 
   // Optional cross-process fence. Creation is atomic; a crash leaves the
   // private owner file, and a new owner must NOT steal it automatically.
@@ -113,6 +125,9 @@ function createVirtualOutbox({ dataDir, now = Date.now, exclusive = false }) {
   } else required(!fs.existsSync(ownerFile), 'exclusive owner is locked');
 
   function ensureOwner() {
+    // In-memory changes may have occurred before the failed commit. Refuse
+    // all further work until a new, operator-reviewed process is recovered.
+    required(!storageFault, 'private storage failure; operator recovery required');
     required(!closed, 'owner already closed');
     if (token) {
       let current;
@@ -133,7 +148,11 @@ function createVirtualOutbox({ dataDir, now = Date.now, exclusive = false }) {
   }
   function persist() {
     ensureOwner();
-    save(filename, data);
+    try { save(filename, data); }
+    catch {
+      storageFault = true;
+      throw new Error('Offline alert outbox: private storage failure; operator recovery required');
+    }
   }
 
   // A process can die after a remote send was accepted, but before local
