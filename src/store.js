@@ -90,6 +90,38 @@ function ensureStateRecordedMarker() {
   return canonicalExists;
 }
 
+// The subscribers file must not become an empty list on unexpected loss:
+// doing so would silently suppress warnings for previously enrolled people.
+// An absent file is permitted ONLY before any enrollment has been persisted.
+const SUBSCRIBER_MARKER = file('subscribers.ever-recorded');
+function ensureSubscribersRecordedMarker(forInitialWrite = false) {
+  let canonicalExists, markerExists;
+  try {
+    canonicalExists = privateRegularFileStatus(file('subscribers.json'));
+    markerExists = privateRegularFileStatus(SUBSCRIBER_MARKER);
+  } catch {
+    // Keep private filesystem errors redacted while identifying which
+    // durable record needs an operator's consent-safe restoration.
+    throw new Error('FloodGuard subscriber private record unavailable; manual recovery required.');
+  }
+  if (!canonicalExists && markerExists) {
+    throw new Error('FloodGuard subscriber store missing after previous recording; manual recovery required.');
+  }
+  if (!markerExists && (canonicalExists || forInitialWrite)) {
+    let fd;
+    try {
+      fd = fs.openSync(SUBSCRIBER_MARKER, 'wx', 0o600);
+      fs.writeSync(fd, 'floodguard-subscribers-recorded-v1\n');
+      fs.fsyncSync(fd);
+    } catch {
+      throw new Error('FloodGuard subscriber record marker unavailable; manual recovery required.');
+    } finally {
+      if (fd !== undefined) { try { fs.closeSync(fd); } catch {} }
+    }
+  }
+  return canonicalExists;
+}
+
 function writeJson(name, value) {
   // A unique, exclusive, owner-only staging file avoids collisions and
   // predictable .tmp symlink attacks. Never use a temp file as a bootstrap
@@ -100,6 +132,8 @@ function writeJson(name, value) {
   try {
     const priorStateExists = name === 'state.json'
       ? ensureStateRecordedMarker() : false;
+    const priorSubscribersExist = name === 'subscribers.json'
+      ? ensureSubscribersRecordedMarker(true) : false;
     const serialized = JSON.stringify(value, null, 2);
     fd = fs.openSync(temporary, 'wx', 0o600);
     staged = true;
@@ -114,6 +148,10 @@ function writeJson(name, value) {
     if (name === 'state.json' && priorStateExists &&
         !privateRegularFileStatus(file('state.json'))) {
       throw new Error('FloodGuard alert state disappeared during write');
+    }
+    if (name === 'subscribers.json' && priorSubscribersExist &&
+        !privateRegularFileStatus(file('subscribers.json'))) {
+      throw new Error('FloodGuard subscriber store disappeared during write');
     }
     fs.renameSync(temporary, file(name));
   } catch {
@@ -130,6 +168,9 @@ function writeJson(name, value) {
 }
 
 function getSubscribers() {
+  // Fail closed if a recorded list disappears or is replaced by a symlink.
+  // Legacy canonical lists gain the independent marker before use.
+  ensureSubscribersRecordedMarker();
   const data = readJson('subscribers.json', []);
   if (!Array.isArray(data) || data.length > MAX_SUBSCRIBERS ||
       data.some(jid => !validSubscriberJid(jid))) {

@@ -194,6 +194,10 @@ function deliveryNotice() {
     if (health.status==='NOT_INITIALIZED') {
       return '\n\n⚠️ *ALERT DELIVERY STATUS UNKNOWN*\nNo verified alert-state baseline has been recorded. Do not rely on automatic delivery; use a manual warning and ask the operator to inspect local state.';
     }
+    // A previously enrolled subscriber list might have disappeared while the
+    // water-state record still looks normal. Never announce quiet delivery
+    // health without verifying the local recipient registry is accessible.
+    getSubscribers();
     return '';
   } catch {
     return '\n\n⚠️ *ALERT DELIVERY STATUS UNKNOWN*\nAutomatic warning delivery cannot be verified. Use a manual warning and ask the operator to inspect the private state.';
@@ -309,6 +313,10 @@ async function sendAll(sock, text) {
     if (recorded.initialized !== true || recorded.deliveryUncertain === true) {
       throw new Error('FloodGuard alert state not eligible for delivery; manual recovery required');
     }
+    // Revalidate durable subscriber consent/record integrity before EACH
+    // recipient. A missing list must not become a silent empty enrollment,
+    // and an unsubscribe during a prior send takes effect immediately.
+    if (!getSubscribers().has(jid)) continue;
     let timer;
     try {
       // Invoke promptly; rejected/synchronous errors have known failure
@@ -336,6 +344,9 @@ async function sendAll(sock, text) {
       if (timer !== undefined) clearTimeout(timer);
     }
   }
+  // Detect subscriber-store deletion or corruption during the final send,
+  // even when there is no next recipient to trigger the loop guard.
+  getSubscribers();
   return { failures, uncertain: false };
 }
 
