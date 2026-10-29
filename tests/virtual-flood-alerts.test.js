@@ -95,7 +95,7 @@ test('virtual WhatsApp receives state transitions, not duplicate or stale flood 
 
 
 test('sensor out-of-range or explicitly null distance cannot fake safety', async () => {
-  for (const input of [0, -1, 400.01, 401, 1000, 'Infinity', 'bad', null, '']) {
+  for (const input of [0, -1, 25.01, 26, 400, 400.01, 401, 1000, 'Infinity', 'bad', null, '']) {
     const snapshot = synthetic(input);
     snapshot.water.levelCm = 0; // potentially stale Firebase child
     snapshot.water.status = 'SAFE';
@@ -109,7 +109,14 @@ test('sensor out-of-range or explicitly null distance cannot fake safety', async
     'an explicit error status defeats potentially stale derived level');
   assert.equal(level({ water: { levelCm: 0, status: 'UNKNOWN' } }), 'SAFE',
     'direct-only valid level provider remains supported');
-  assert.equal(level(synthetic(400)), 'SAFE', 'HC-SR04 upper valid range remains accepted');
+  assert.equal(level(synthetic(25)), 'SAFE', 'calibrated bottom remains valid');
+  assert.equal(level(synthetic(25.01)), 'UNKNOWN',
+    'transducer range is not the installed sensor-to-bottom height');
+  assert.equal(level(synthetic(400)), 'UNKNOWN',
+    '400cm transducer capability must never be presented as safe in a 25cm tank');
+  assert.equal(level({
+    water: { distanceCm: 25, levelCm: 0, status: 'SENSOR_ERROR' }
+  }), 'SENSOR_ERROR', 'sensor failure must override a plausible SAFE air gap');
 });
 
 test('unknown servo telemetry must not turn an OPEN gate into CLOSED', () => {
