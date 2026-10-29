@@ -97,8 +97,22 @@ function level(live) {
 }
 
 function risk(live) {
-  const r = upper(live?.system?.overallRisk);
-  return ['LOW', 'MODERATE', 'HIGH', 'SEVERE', 'CRITICAL'].includes(r) ? r : 'UNKNOWN';
+  const reported = upper(live?.system?.overallRisk);
+  const water = level(live);
+  // The independent, physically bounded water reading cannot coexist with
+  // a LOWER overall-risk label carried by an older multi-location PATCH.
+  // A trusted DANGER water level is CRITICAL, and WARNING is at least HIGH.
+  if (water === 'DANGER') return 'CRITICAL';
+  if (water === 'WARNING' &&
+      !['HIGH', 'SEVERE', 'CRITICAL'].includes(reported)) return 'HIGH';
+
+  // Neither stale time nor missing/failed water measurements can establish
+  // LOW from an unverified backend text field. Preserve HIGH+ warnings.
+  if ((isStale(live) ||
+       water === 'UNKNOWN' || water === 'SENSOR_ERROR') &&
+      ['LOW', 'MODERATE'].includes(reported)) return 'UNKNOWN';
+  return ['LOW', 'MODERATE', 'HIGH', 'SEVERE', 'CRITICAL'].includes(reported)
+    ? reported : 'UNKNOWN';
 }
 
 const EARLIEST_FIELD_TIME_MS = Date.UTC(2000, 0, 1);
@@ -556,6 +570,7 @@ module.exports = {
   normalizeDevice,
   level,
   waterLevelCm,
+  risk,
   isStale,
   fieldTimeMs
 };
