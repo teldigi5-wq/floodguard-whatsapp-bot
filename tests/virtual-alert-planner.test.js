@@ -46,7 +46,7 @@ test('threshold transitions produce deterministic, explicitly synthetic events',
 test('invalid and stale physical readings never create a SAFE recovery',()=>{
   const now=Date.now();
   const previous={topic:'water',phase:'DANGER',sourceAt:now-3000};
-  for(const value of [null,'', ' ',0,-1,401,'NaN',false,{},[],Infinity]){
+  for(const value of [null,'', ' ',0,-1,25.01,26,400,401,'NaN',false,{},[],Infinity]){
     const out=plan(live(value,now-1000,'SAFE'),previous,now);
     assert.equal(out.accepted,false,String(value));
     assert.equal(out.observation,null);
@@ -57,6 +57,18 @@ test('invalid and stale physical readings never create a SAFE recovery',()=>{
     assert.equal(out.accepted,false,String(ts));
     assert.equal(out.alert,null);
   }
+});
+
+test('valid-looking air gap with explicit sensor ERROR cannot plan SAFE recovery',()=>{
+  const now=Date.now();
+  const previous={topic:'water',phase:'DANGER',sourceAt:now-4000};
+  for(const status of ['SENSOR_ERROR','ERROR','INVALID','OFFLINE','UNAVAILABLE']){
+    const out=plan(live(25,now-1000,status),previous,now);
+    assert.equal(out.accepted,false,status);
+    assert.equal(out.reason,'NO_VERIFIED_AIR_GAP',status);
+    assert.equal(out.alert,null,status);
+  }
+  assert.equal(plan(live(25,now-1000,'SAFE'),previous,now).alert.phase,'SAFE');
 });
 
 test('older source clock and equal-source contradictions are rejected',()=>{
