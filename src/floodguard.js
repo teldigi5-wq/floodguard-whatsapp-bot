@@ -47,26 +47,33 @@ function sensorNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 function waterLevelCm(live) {
-  // The physical HC-SR04 air gap is the authoritative live measurement.
-  // Firebase multi-location PATCHes can briefly leave levelCm/status one event
-  // behind distanceCm, so derive the level from distance whenever available.
-  const reportedDistance = live?.water?.distanceCm;
-  const distance = sensorNumber(reportedDistance);
+  // The calibrated sensor-to-bottom height is an INSTALLATION property,
+  // not the HC-SR04 manufacturer's maximum measurable distance (400 cm).
+  // An air gap larger than this installation's height cannot establish SAFE.
+  if (!Number.isFinite(WATER_SENSOR_TO_BOTTOM_CM) ||
+      WATER_SENSOR_TO_BOTTOM_CM <= 0 ||
+      WATER_SENSOR_TO_BOTTOM_CM > 400) return null;
+
+  // An explicit sensor failure takes precedence over a plausible numeric
+  // placeholder from an old Firebase child or partial multi-location PATCH.
+  const health = upper(live?.water?.status);
+  if (['SENSOR_ERROR', 'ERROR', 'INVALID', 'OFFLINE', 'UNAVAILABLE',
+       'DISCONNECTED', 'NOT_INSTALLED', 'REMOVED'].includes(health)) return null;
+
+  // HC-SR04 air gap is authoritative when present; never fall back to
+  // levelCm after observing a corrupt or physically impossible distance.
+  const distance = sensorNumber(live?.water?.distanceCm);
   if (live?.water != null && Object.hasOwn(live.water, 'distanceCm')) {
-    // HC-SR04 out-of-range measurements are errors, not SAFE. Do not use a
-    // potentially stale levelCm to hide a present but invalid air-gap reading.
-    if (distance === null || distance <= 0 || distance > 400) return null;
-    return Math.max(0, Math.min(WATER_SENSOR_TO_BOTTOM_CM, WATER_SENSOR_TO_BOTTOM_CM - distance));
+    if (distance === null || distance <= 0 ||
+        distance > WATER_SENSOR_TO_BOTTOM_CM) return null;
+    return WATER_SENSOR_TO_BOTTOM_CM - distance;
   }
 
-  // Direct-only providers are supported, but an explicit invalid air-gap
-  // field or an error status must not be overwritten with stale level data.
-  if (['SENSOR_ERROR', 'ERROR'].includes(upper(live?.water?.status))) return null;
+  // Legacy level-only providers require equally bounded numeric evidence.
   const direct = sensorNumber(live?.water?.levelCm);
   if (direct !== null && direct >= 0 && direct <= WATER_SENSOR_TO_BOTTOM_CM) {
     return direct;
   }
-
   return null;
 }
 
@@ -548,6 +555,7 @@ module.exports = {
   normalizeGate,
   normalizeDevice,
   level,
+  waterLevelCm,
   isStale,
   fieldTimeMs
 };
