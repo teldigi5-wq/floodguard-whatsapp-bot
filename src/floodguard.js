@@ -28,7 +28,8 @@ function normalizeGate(live) {
   const countdown = sensorNumber(live?.gate?.countdownSeconds);
   const reported = upper(live?.gate?.status);
   const raw = reported === 'OPENING_WARNING' ? 'COUNTDOWN' : reported;
-  const angleValid = angle !== null && angle >= 0 && angle <= 90;
+  const angleValid = angle !== null && Number.isInteger(angle) &&
+    angle >= 0 && angle <= 90;
   const countdownValid = countdown === null ||
     (Number.isInteger(countdown) && countdown >= 0 && countdown <= 10);
 
@@ -40,10 +41,10 @@ function normalizeGate(live) {
   // partial update; it is NOT a verified movement or countdown.
   if (countdown !== null && countdown > 0) return 'UNKNOWN';
   if (raw === 'OPEN') {
-    return angle === null || angle >= 80 ? 'OPEN' : 'UNKNOWN';
+    return angleValid && angle >= 80 ? 'OPEN' : 'UNKNOWN';
   }
   if (raw === 'CLOSED') {
-    return angle === null || angle <= 10 ? 'CLOSED' : 'UNKNOWN';
+    return angleValid && angle <= 10 ? 'CLOSED' : 'UNKNOWN';
   }
   // Angle alone cannot establish a physical gate transition.
   return 'UNKNOWN';
