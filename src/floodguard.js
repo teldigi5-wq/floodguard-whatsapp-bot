@@ -1,7 +1,12 @@
 const { getSubscribers, subscribe, unsubscribe, getState, saveState } = require('./store');
 const { assessDeliveryState } = require('./deliveryRecovery');
 
-const STALE_AFTER_MS = Number(process.env.FLOODGUARD_STALE_MS || 15000);
+// An invalid freshness window must never turn historical telemetry into LIVE.
+// Configuration is bounded; malformed or unsafe values fail closed (all stale).
+const configuredStaleAfterMs = Number(process.env.FLOODGUARD_STALE_MS ?? 15000);
+const STALE_AFTER_MS = Number.isSafeInteger(configuredStaleAfterMs) &&
+  configuredStaleAfterMs >= 1000 && configuredStaleAfterMs <= 60000
+    ? configuredStaleAfterMs : null;
 
 const v = (x, suffix = '') =>
   x === undefined || x === null || x === '' ? 'NOT AVAILABLE' : `${x}${suffix}`;
@@ -21,17 +26,44 @@ function normalizeDevice(x) {
 }
 
 function normalizeGate(live) {
-  // Do not coerce null or blank telemetry into physical position zero.
+  // Controller state is NOT a physical proof. An old angle can contradict
+  // a newer status when Firebase child updates arrive separately. Never
+  // infer CLOSED from angle zero while the controller reports OPEN.
   const angle = sensorNumber(live?.gate?.angle);
   const countdown = sensorNumber(live?.gate?.countdownSeconds);
-  let raw = upper(live?.gate?.status);
+  const reported = upper(live?.gate?.status);
+  const raw = reported === 'OPENING_WARNING' ? 'COUNTDOWN' : reported;
+  const angleValid = angle !== null && Number.isInteger(angle) &&
+    angle >= 0 && angle <= 90;
+  const countdownValid = countdown === null ||
+    (Number.isInteger(countdown) && countdown >= 0 && countdown <= 10);
 
-  if (raw === 'OPENING_WARNING') raw = 'COUNTDOWN';
-  if (Number.isFinite(countdown) && countdown > 0) return 'COUNTDOWN';
-  if (Number.isFinite(angle) && angle >= 80) return 'OPEN';
-  if (Number.isFinite(angle) && angle <= 2) return 'CLOSED';
-  if (['CLOSED', 'COUNTDOWN', 'OPEN'].includes(raw)) return raw;
+  if (!countdownValid || (angle !== null && !angleValid)) return 'UNKNOWN';
+  if (raw === 'COUNTDOWN') {
+    return countdown !== null && countdown > 0 ? 'COUNTDOWN' : 'UNKNOWN';
+  }
+  // Positive countdown with an explicitly OPEN or CLOSED status indicates a
+  // partial update; it is NOT a verified movement or countdown.
+  if (countdown !== null && countdown > 0) return 'UNKNOWN';
+  if (raw === 'OPEN') {
+    return angleValid && angle >= 80 ? 'OPEN' : 'UNKNOWN';
+  }
+  if (raw === 'CLOSED') {
+    return angleValid && angle <= 10 ? 'CLOSED' : 'UNKNOWN';
+  }
+  // Angle alone cannot establish a physical gate transition.
   return 'UNKNOWN';
+}
+
+function consistentGatePosition(live, target) {
+  const angle = sensorNumber(live?.gate?.angle);
+  const raw = upper(live?.gate?.status);
+  if (angle === null || !Number.isInteger(angle) ||
+      angle < 0 || angle > 90 ||
+      normalizeGate(live) !== target) return false;
+  if (target === 'OPEN') return raw === 'OPEN' && angle >= 80;
+  if (target === 'CLOSED') return raw === 'CLOSED' && angle <= 10;
+  return false;
 }
 
 const WATER_SENSOR_TO_BOTTOM_CM = Number(process.env.WATER_SENSOR_TO_BOTTOM_CM || 25);
@@ -47,26 +79,33 @@ function sensorNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 function waterLevelCm(live) {
-  // The physical HC-SR04 air gap is the authoritative live measurement.
-  // Firebase multi-location PATCHes can briefly leave levelCm/status one event
-  // behind distanceCm, so derive the level from distance whenever available.
-  const reportedDistance = live?.water?.distanceCm;
-  const distance = sensorNumber(reportedDistance);
+  // The calibrated sensor-to-bottom height is an INSTALLATION property,
+  // not the HC-SR04 manufacturer's maximum measurable distance (400 cm).
+  // An air gap larger than this installation's height cannot establish SAFE.
+  if (!Number.isFinite(WATER_SENSOR_TO_BOTTOM_CM) ||
+      WATER_SENSOR_TO_BOTTOM_CM <= 0 ||
+      WATER_SENSOR_TO_BOTTOM_CM > 400) return null;
+
+  // An explicit sensor failure takes precedence over a plausible numeric
+  // placeholder from an old Firebase child or partial multi-location PATCH.
+  const health = upper(live?.water?.status);
+  if (['SENSOR_ERROR', 'ERROR', 'INVALID', 'OFFLINE', 'UNAVAILABLE',
+       'DISCONNECTED', 'NOT_INSTALLED', 'REMOVED'].includes(health)) return null;
+
+  // HC-SR04 air gap is authoritative when present; never fall back to
+  // levelCm after observing a corrupt or physically impossible distance.
+  const distance = sensorNumber(live?.water?.distanceCm);
   if (live?.water != null && Object.hasOwn(live.water, 'distanceCm')) {
-    // HC-SR04 out-of-range measurements are errors, not SAFE. Do not use a
-    // potentially stale levelCm to hide a present but invalid air-gap reading.
-    if (distance === null || distance <= 0 || distance > 400) return null;
-    return Math.max(0, Math.min(WATER_SENSOR_TO_BOTTOM_CM, WATER_SENSOR_TO_BOTTOM_CM - distance));
+    if (distance === null || distance <= 0 ||
+        distance > WATER_SENSOR_TO_BOTTOM_CM) return null;
+    return WATER_SENSOR_TO_BOTTOM_CM - distance;
   }
 
-  // Direct-only providers are supported, but an explicit invalid air-gap
-  // field or an error status must not be overwritten with stale level data.
-  if (['SENSOR_ERROR', 'ERROR'].includes(upper(live?.water?.status))) return null;
+  // Legacy level-only providers require equally bounded numeric evidence.
   const direct = sensorNumber(live?.water?.levelCm);
   if (direct !== null && direct >= 0 && direct <= WATER_SENSOR_TO_BOTTOM_CM) {
     return direct;
   }
-
   return null;
 }
 
@@ -85,13 +124,28 @@ function level(live) {
   // enough to assert a safe water level or announce recovery.
   if (s === 'SAFE') return 'UNKNOWN';
   if (['WARNING', 'DANGER'].includes(s)) return s;
-  if (s === 'SENSOR_ERROR' || s === 'ERROR') return 'SENSOR_ERROR';
+  if (['SENSOR_ERROR', 'ERROR', 'INVALID', 'OFFLINE', 'UNAVAILABLE',
+       'DISCONNECTED', 'NOT_INSTALLED', 'REMOVED'].includes(s)) return 'SENSOR_ERROR';
   return 'UNKNOWN';
 }
 
 function risk(live) {
-  const r = upper(live?.system?.overallRisk);
-  return ['LOW', 'MODERATE', 'HIGH', 'SEVERE', 'CRITICAL'].includes(r) ? r : 'UNKNOWN';
+  const reported = upper(live?.system?.overallRisk);
+  const water = level(live);
+  // The independent, physically bounded water reading cannot coexist with
+  // a LOWER overall-risk label carried by an older multi-location PATCH.
+  // A trusted DANGER water level is CRITICAL, and WARNING is at least HIGH.
+  if (water === 'DANGER') return 'CRITICAL';
+  if (water === 'WARNING' &&
+      !['HIGH', 'SEVERE', 'CRITICAL'].includes(reported)) return 'HIGH';
+
+  // Neither stale time nor missing/failed water measurements can establish
+  // LOW from an unverified backend text field. Preserve HIGH+ warnings.
+  if ((isStale(live) ||
+       water === 'UNKNOWN' || water === 'SENSOR_ERROR') &&
+      ['LOW', 'MODERATE'].includes(reported)) return 'UNKNOWN';
+  return ['LOW', 'MODERATE', 'HIGH', 'SEVERE', 'CRITICAL'].includes(reported)
+    ? reported : 'UNKNOWN';
 }
 
 const EARLIEST_FIELD_TIME_MS = Date.UTC(2000, 0, 1);
@@ -118,7 +172,7 @@ function fieldTimeMs(live, now = Date.now()) {
 function isStale(live) {
   const now = Date.now();
   const ts = fieldTimeMs(live, now);
-  return ts === null || now - ts > STALE_AFTER_MS;
+  return STALE_AFTER_MS === null || ts === null || now - ts > STALE_AFTER_MS;
 }
 
 function ageText(live) {
@@ -176,7 +230,7 @@ Real-time Flood Monitoring & Dam Gate Alerts
 🌧️ *rain* — rain-gauge availability
 🚨 *emergency* — alarm summary
 📶 *network* — ESP8266 connection
-🔔 *subscribe* — automatic alerts ON
+🔔 *subscribe* — request alert subscription
 🔕 *unsubscribe* — automatic alerts OFF
 ❓ *help* — show this menu
 
@@ -191,6 +245,13 @@ function deliveryNotice() {
     if (health.status==='DELIVERY_DEGRADED') {
       return '\n\n⚠️ *DELIVERY DEGRADED*\nSome automatic alert attempts failed. Recipient receipt has not been verified; use a manual warning if needed.';
     }
+    if (health.status==='NOT_INITIALIZED') {
+      return '\n\n⚠️ *ALERT DELIVERY STATUS UNKNOWN*\nNo verified alert-state baseline has been recorded. Do not rely on automatic delivery; use a manual warning and ask the operator to inspect local state.';
+    }
+    // A previously enrolled subscriber list might have disappeared while the
+    // water-state record still looks normal. Never announce quiet delivery
+    // health without verifying the local recipient registry is accessible.
+    getSubscribers();
     return '';
   } catch {
     return '\n\n⚠️ *ALERT DELIVERY STATUS UNKNOWN*\nAutomatic warning delivery cannot be verified. Use a manual warning and ask the operator to inspect the private state.';
@@ -223,7 +284,7 @@ ${freshnessLine(live)}
 async function commandReply(jid, text, getLive) {
   const c = String(text || '').trim().toLowerCase().split(/\s+/)[0];
 
-  if (['hi', 'hello', 'hey', 'menu', 'help', 'start'].includes(c)) return menu();
+  if (['hi', 'hello', 'hey', 'menu', 'help', 'start'].includes(c)) return menu() + deliveryNotice();
   if (c === 'subscribe') {
     subscribe(jid);
     const notice=deliveryNotice();
@@ -234,7 +295,7 @@ async function commandReply(jid, text, getLive) {
   }
   if (c === 'unsubscribe') {
     unsubscribe(jid);
-    return '🔕 *FLOODGUARD ALERTS DISABLED*\n\nAutomatic FloodGuard alerts have been stopped.';
+    return '🔕 *FLOODGUARD ALERTS DISABLED*\n\nAutomatic FloodGuard alerts have been stopped.' + deliveryNotice();
   }
 
   let live;
@@ -249,7 +310,7 @@ async function commandReply(jid, text, getLive) {
   if (!live) return '⚠️ FloodGuard live data is NOT AVAILABLE right now.' + deliveryNotice();
 
   if (c === 'water') {
-    return `💧 *WATER LEVEL*\n\n${freshnessLine(live)}\n💧 Actual Level: ${v(waterLevelCm(live), ' cm')}\n📏 HC-SR04 Air Gap: ${v(live?.water?.distanceCm, ' cm')}\nStatus: *${level(live)}*\n\nRules: SAFE <8.5 cm · WARNING 8.5–<11 cm · DANGER ≥11 cm.`;
+    return `💧 *WATER LEVEL*\n\n${freshnessLine(live)}\n💧 Actual Level: ${v(waterLevelCm(live), ' cm')}\n📏 HC-SR04 Air Gap: ${v(live?.water?.distanceCm, ' cm')}\nStatus: *${level(live)}*\n\nRules: SAFE <8.5 cm · WARNING 8.5–<11 cm · DANGER ≥11 cm.${deliveryNotice()}`;
   }
 
   if (['risk', 'flood'].includes(c)) {
@@ -259,33 +320,33 @@ async function commandReply(jid, text, getLive) {
   if (c === 'gate') {
     const g = normalizeGate(live);
     const cd = Number(live?.gate?.countdownSeconds);
-    return `🚧 *DAM GATE*\n\nStatus: *${g}*\nAngle: ${v(live?.gate?.angle, '°')}\nCountdown: ${isStale(live) ? 'NOT LIVE (stored countdown)' : g === 'COUNTDOWN' && Number.isFinite(cd) && cd > 0 ? `${cd} seconds` : 'NOT ACTIVE'}\nReason: ${v(live?.gate?.reason)}\n\n${freshnessLine(live)}`;
+    return `🚧 *DAM GATE*\n\nStatus: *${g}*\nAngle: ${v(live?.gate?.angle, '°')}\nCountdown: ${isStale(live) ? 'NOT LIVE (stored countdown)' : g === 'COUNTDOWN' && Number.isFinite(cd) && cd > 0 ? `${cd} seconds` : 'NOT ACTIVE'}\nReason: ${v(live?.gate?.reason)}\n\n${freshnessLine(live)}${deliveryNotice()}`;
   }
 
   if (['rain', 'rainfall'].includes(c)) {
     if (!rainInstalled(live)) {
-      return `🌧️ *RAINFALL*\n\n${freshnessLine(live)}\n\nRain Gauge: *${normalizeDevice(live?.devices?.rainGauge)}*\n\nReal collector sensor data is currently unavailable. No rainfall value is fabricated.`;
+      return `🌧️ *RAINFALL*\n\n${freshnessLine(live)}\n\nRain Gauge: *${normalizeDevice(live?.devices?.rainGauge)}*\n\nReal collector sensor data is currently unavailable. No rainfall value is fabricated.${deliveryNotice()}`;
     }
     const depth = live?.rain?.waterDepthCm;
     const raw = live?.rain?.rawValue;
     const limited = live?.rain?.calibrationLimited === true;
     const weight = live?.rain?.weightGrams;
-    return `🌧️ *RAINFALL*\n\nCurrent: ${v(live?.rain?.currentMm, ' mm')}\nAccumulated: ${v(live?.rain?.dailyMm, ' mm')}\nCategory: ${v(live?.rain?.status)}\nCollector depth: ${v(depth, ' cm')}\nSensor RAW: ${v(raw)}\nGauge weight: ${weight == null ? 'Unavailable (no load cell)' : v(weight, ' g')}\nCalibration: ${limited ? 'LIMITED - highest calibrated depth reached' : 'OK'}\n\n${freshnessLine(live)}`;
+    return `🌧️ *RAINFALL*\n\nCurrent: ${v(live?.rain?.currentMm, ' mm')}\nAccumulated: ${v(live?.rain?.dailyMm, ' mm')}\nCategory: ${v(live?.rain?.status)}\nCollector depth: ${v(depth, ' cm')}\nSensor RAW: ${v(raw)}\nGauge weight: ${weight == null ? 'Unavailable (no load cell)' : v(weight, ' g')}\nCalibration: ${limited ? 'LIMITED - highest calibrated depth reached' : 'OK'}\n\n${freshnessLine(live)}${deliveryNotice()}`;
   }
 
   if (['devices', 'health'].includes(c)) {
-    return `🔧 *${isStale(live) ? 'LAST REPORTED DEVICE HEALTH' : 'DEVICE HEALTH'}*\n\n${freshnessLine(live)}\n\n${deviceLines(live)}\n\n💾 MicroSD: NOT INSTALLED\n📱 GSM: NOT INSTALLED`;
+    return `🔧 *${isStale(live) ? 'LAST REPORTED DEVICE HEALTH' : 'DEVICE HEALTH'}*\n\n${freshnessLine(live)}\n\n${deviceLines(live)}\n\n💾 MicroSD: NOT INSTALLED\n📱 GSM: NOT INSTALLED${deliveryNotice()}`;
   }
 
   if (['network', 'esp', 'wifi'].includes(c)) {
-    return `📶 *ESP8266 NETWORK*\n\nStatus: ${normalizeDevice(live?.esp8266?.status)}\nConnection: ${v(live?.esp8266?.connection)}\nSignal: ${v(live?.esp8266?.rssi, ' dBm')}\n\n${freshnessLine(live)}`;
+    return `📶 *ESP8266 NETWORK*\n\nStatus: ${normalizeDevice(live?.esp8266?.status)}\nConnection: ${v(live?.esp8266?.connection)}\nSignal: ${v(live?.esp8266?.rssi, ' dBm')}\n\n${freshnessLine(live)}${deliveryNotice()}`;
   }
 
   if (['emergency', 'alarm'].includes(c)) {
     return `🚨 *${isStale(live) ? 'LAST RECORDED ALARM STATUS' : 'EMERGENCY STATUS'}*\n\n${freshnessLine(live)}\n\nAlarm: ${boolText(live?.alarm?.active)}\nType: ${v(live?.alarm?.type)}\nRisk: *${risk(live)}*\nWater: *${level(live)}*\nGate: *${normalizeGate(live)}*${deliveryNotice()}`;
   }
 
-  return `❓ Unknown command: *${c || '(empty)'}*\n\nSend *menu* to see FloodGuard commands.`;
+  return `❓ Unknown command: *${c || '(empty)'}*\n\nSend *menu* to see FloodGuard commands.${deliveryNotice()}`;
 }
 
 async function sendAll(sock, text) {
@@ -299,6 +360,17 @@ async function sendAll(sock, text) {
   const subscribers = [...getSubscribers()];
   let failures = 0;
   for (const jid of subscribers) {
+    // The canonical alert state may have vanished or become quarantined after
+    // an earlier recipient was contacted. Check before EACH next external send
+    // so a partial batch cannot silently continue after lost local evidence.
+    const recorded = getState();
+    if (recorded.initialized !== true || recorded.deliveryUncertain === true) {
+      throw new Error('FloodGuard alert state not eligible for delivery; manual recovery required');
+    }
+    // Revalidate durable subscriber consent/record integrity before EACH
+    // recipient. A missing list must not become a silent empty enrollment,
+    // and an unsubscribe during a prior send takes effect immediately.
+    if (!getSubscribers().has(jid)) continue;
     let timer;
     try {
       // Invoke promptly; rejected/synchronous errors have known failure
@@ -326,6 +398,9 @@ async function sendAll(sock, text) {
       if (timer !== undefined) clearTimeout(timer);
     }
   }
+  // Detect subscriber-store deletion or corruption during the final send,
+  // even when there is no next recipient to trigger the loop guard.
+  getSubscribers();
   return { failures, uncertain: false };
 }
 
@@ -354,12 +429,19 @@ function processLiveChange(sock, live) {
 async function processLiveChangeSerial(sock, live) {
   if (!live) return;
 
-  let currentLevel = level(live);
+  const observedLevel = level(live);
+  const sensorFault = observedLevel === 'SENSOR_ERROR';
+  let currentLevel = observedLevel;
   const currentGate = normalizeGate(live);
   const countdown = Number(live?.gate?.countdownSeconds);
   const stale = isStale(live);
   const sourceAt = fieldTimeMs(live);
   let state = getState();
+  // Once a sensor fault has been reported, an UNKNOWN reading cannot prove
+  // that the fault has recovered. Only valid numeric evidence clears the
+  // durable fault-notification latch.
+  const sensorFaultActive = sensorFault ||
+    (state.sensorFaultActive === true && waterLevelCm(live) === null);
   // SSE children can reconnect and deliver valid observations out of order.
   // Serialize processing AND reject field timestamps older than the most
   // recent persisted observation to prevent false SAFE recovery.
@@ -367,7 +449,8 @@ async function processLiveChangeSerial(sock, live) {
   if (sourceAt !== null && sourceAt < lastSourceAt) return;
   // Preserve the previous confirmed danger/warning state if this update is
   // missing its physical reading; only verified measurements clear it.
-  if (currentLevel === 'UNKNOWN' && waterLevelCm(live) === null &&
+  if ((currentLevel === 'UNKNOWN' || sensorFault) &&
+      waterLevelCm(live) === null &&
       ['WARNING', 'DANGER'].includes(state.level)) {
     currentLevel = state.level;
   }
@@ -398,6 +481,7 @@ async function processLiveChangeSerial(sock, live) {
     saveState({
       ...state, lastObservedLevel: currentLevel, lastSeenAt: Date.now(),
       lastSourceAt: sourceAt ?? state.lastSourceAt, dataStale: false,
+      sensorFaultActive,
       deliveryDegraded: true
     });
     return;
@@ -413,7 +497,8 @@ async function processLiveChangeSerial(sock, live) {
       sentCountdown: [],
       lastSeenAt: Date.now(),
       lastSourceAt: sourceAt,
-      dataStale: false
+      dataStale: false,
+      sensorFaultActive
     });
     return;
   }
@@ -430,6 +515,7 @@ async function processLiveChangeSerial(sock, live) {
         ...state, initialized: true, level: currentLevel,
         gateStatus: currentGate, lastObservedLevel: currentLevel,
         lastSeenAt: failedAt, lastSourceAt: sourceAt, dataStale: false,
+        sensorFaultActive,
         alertSendFailureCount:
           (Number.isSafeInteger(state.alertSendFailureCount) &&
            state.alertSendFailureCount >= 0 ? state.alertSendFailureCount : 0) +
@@ -448,6 +534,13 @@ async function processLiveChangeSerial(sock, live) {
   let sentCountdown = Array.isArray(state.sentCountdown) ? state.sentCountdown : [];
   let lastEventKey = state.lastEventKey || '';
 
+  // Sensor-health changes are distinct from flood-level transitions.
+  // Persist the fault latch so repeated SSE callbacks or process restarts
+  // cannot generate duplicate sensor-failure notifications.
+  if (sensorFault && state.sensorFaultActive !== true) {
+    await sendAlert('⚠️ *FLOODGUARD SENSOR ALERT*\n\nThe water sensor is not providing a valid reading. Previously reported WARNING or DANGER is NOT cleared by this fault. Do not treat the reservoir as safe; use supervised checks.');
+  }
+
   if (previousLevel !== currentLevel) {
     const key = eventKey('level', live, `${previousLevel}->${currentLevel}`);
     if (key !== lastEventKey) {
@@ -457,8 +550,6 @@ async function processLiveChangeSerial(sock, live) {
         await sendAlert( `🚨 *FLOODGUARD DANGER*\n\nCritical water level detected.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: DANGER\n🛡️ Risk: ${risk(live)}\n🚨 Alarm: ${boolText(live?.alarm?.active)}\n\nFloodGuard is monitoring the gate-opening sequence.`);
       } else if (currentLevel === 'SAFE' && ['WARNING', 'DANGER'].includes(previousLevel)) {
         await sendAlert( `✅ *FLOODGUARD RECOVERY*\n\nWater conditions have returned to SAFE.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: ${currentGate}\n🛡️ Risk: ${risk(live)}`);
-      } else if (currentLevel === 'SENSOR_ERROR') {
-        await sendAlert( '⚠️ *FLOODGUARD SENSOR ALERT*\n\nThe water sensor is not providing a valid reading. FloodGuard will not fabricate a water level.');
       }
       lastEventKey = key;
     }
@@ -485,20 +576,23 @@ async function processLiveChangeSerial(sock, live) {
     }
   }
 
-  if (currentGate === 'OPEN' && previousGate !== 'OPEN') {
-    await sendAlert( `🚧 *FLOODGUARD DAM GATE OPEN*\n\nThe prototype dam gate is OPEN.\n\n📐 Servo Angle: ${v(live?.gate?.angle, '°')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: ${currentLevel}\n🛡️ Risk: ${risk(live)}`);
+  if (currentGate === 'OPEN' && previousGate !== 'OPEN' &&
+      consistentGatePosition(live, 'OPEN')) {
+    await sendAlert( `🚧 *FLOODGUARD DAM GATE OPEN*\n\nController reports the prototype dam gate OPEN. Physical position is not independently verified.\n\n📐 Servo Angle: ${v(live?.gate?.angle, '°')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: ${currentLevel}\n🛡️ Risk: ${risk(live)}`);
     procedureId = null;
     sentCountdown = [];
   }
 
-  if (procedureId && currentGate === 'CLOSED' && currentLevel !== 'DANGER') {
-    await sendAlert( `✅ *GATE OPENING CANCELLED*\n\nThe countdown ended because the confirmed water state changed.\n\n🚧 Gate: CLOSED\n💧 Water: ${currentLevel}`);
+  if (procedureId && currentGate === 'CLOSED' && currentLevel !== 'DANGER' &&
+      consistentGatePosition(live, 'CLOSED')) {
+    await sendAlert( `✅ *GATE OPENING CANCELLED*\n\nThe controller reports CLOSED and the countdown has ended. Physical gate closure is not independently verified.\n\n🚧 Gate: CLOSED\n💧 Water: ${currentLevel}`);
     procedureId = null;
     sentCountdown = [];
   }
 
-  if (previousGate === 'OPEN' && currentGate === 'CLOSED') {
-    await sendAlert( `🔒 *DAM GATE CLOSED*\n\nThe prototype gate has returned to 0°.\n\n💧 Water: ${currentLevel}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}`);
+  if (previousGate === 'OPEN' && currentGate === 'CLOSED' &&
+      consistentGatePosition(live, 'CLOSED')) {
+    await sendAlert( `🔒 *DAM GATE CLOSED*\n\nController reports gate CLOSED near 0°. Physical closure is not independently verified.\n\n💧 Water: ${currentLevel}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}`);
   }
 
   saveState({
@@ -516,7 +610,8 @@ async function processLiveChangeSerial(sock, live) {
         ? state.alertSendFailureCount : 0) + failedSends,
     deliveryDegraded: failedSends > 0 || state.deliveryDegraded === true,
     lastDeliveryFailureAt: failedSends > 0 ? Date.now() : state.lastDeliveryFailureAt,
-    dataStale: false
+    dataStale: false,
+    sensorFaultActive
   });
 }
 
@@ -525,8 +620,11 @@ module.exports = {
   processLiveChange,
   stats,
   normalizeGate,
+  consistentGatePosition,
   normalizeDevice,
   level,
+  waterLevelCm,
+  risk,
   isStale,
   fieldTimeMs
 };

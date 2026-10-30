@@ -2,7 +2,7 @@
 
 // A pure, offline-only planning boundary. Not imported by bot.js or by the
 // production alert dispatcher. Never initiates network, QR or WhatsApp calls.
-const { fieldTimeMs, level } = require('./floodguard');
+const { fieldTimeMs, level, waterLevelCm } = require('./floodguard');
 const ACCEPTED = new Set(['SAFE', 'WARNING', 'DANGER']);
 const MAX_SOURCE_AGE_MS = 15000;
 
@@ -15,8 +15,9 @@ function trustworthyAirGap(live) {
   const raw=live?.water?.distanceCm;
   if(typeof raw !== 'number' && typeof raw !== 'string') return false;
   if(typeof raw === 'string' && !raw.trim()) return false;
-  const n=Number(raw);
-  return Number.isFinite(n) && n > 0 && n <= 400;
+  // Share the production model's installation calibration and explicit
+  // sensor-fault precedence. Physical transducer range is NOT tank depth.
+  return Number.isFinite(waterLevelCm(live));
 }
 
 function planVirtualWaterSnapshot({live,previous=null,now=Date.now()}={}) {

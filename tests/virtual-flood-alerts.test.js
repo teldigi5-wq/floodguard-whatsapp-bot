@@ -9,7 +9,7 @@ const path = require('node:path');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'floodguard-virtual-test-'));
 process.env.DATA_PATH = dir;
-const { subscribe, getState } = require('../src/store');
+const { subscribe, getState, saveState } = require('../src/store');
 const { commandReply, processLiveChange, level, isStale, normalizeGate } = require('../src/floodguard');
 test.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
@@ -47,6 +47,8 @@ test('missing, null, blank and invalid sensor measurements never become zero or 
 });
 
 test('virtual WhatsApp receives state transitions, not duplicate or stale flood alerts', async () => {
+  // Deliberate fixture bootstrap; absent production state fails closed.
+  saveState({initialized:false,level:'UNKNOWN',gateStatus:'UNKNOWN',procedureId:null,sentCountdown:[]});
   const sent = [];
   const jid = 'test-only@s.whatsapp.net';
   const sock = { sendMessage: async (recipient, content) => sent.push({ recipient, text: content.text }) };
@@ -93,7 +95,7 @@ test('virtual WhatsApp receives state transitions, not duplicate or stale flood 
 
 
 test('sensor out-of-range or explicitly null distance cannot fake safety', async () => {
-  for (const input of [0, -1, 400.01, 401, 1000, 'Infinity', 'bad', null, '']) {
+  for (const input of [0, -1, 25.01, 26, 400, 400.01, 401, 1000, 'Infinity', 'bad', null, '']) {
     const snapshot = synthetic(input);
     snapshot.water.levelCm = 0; // potentially stale Firebase child
     snapshot.water.status = 'SAFE';
@@ -107,13 +109,20 @@ test('sensor out-of-range or explicitly null distance cannot fake safety', async
     'an explicit error status defeats potentially stale derived level');
   assert.equal(level({ water: { levelCm: 0, status: 'UNKNOWN' } }), 'SAFE',
     'direct-only valid level provider remains supported');
-  assert.equal(level(synthetic(400)), 'SAFE', 'HC-SR04 upper valid range remains accepted');
+  assert.equal(level(synthetic(25)), 'SAFE', 'calibrated bottom remains valid');
+  assert.equal(level(synthetic(25.01)), 'UNKNOWN',
+    'transducer range is not the installed sensor-to-bottom height');
+  assert.equal(level(synthetic(400)), 'UNKNOWN',
+    '400cm transducer capability must never be presented as safe in a 25cm tank');
+  assert.equal(level({
+    water: { distanceCm: 25, levelCm: 0, status: 'SENSOR_ERROR' }
+  }), 'SENSOR_ERROR', 'sensor failure must override a plausible SAFE air gap');
 });
 
 test('unknown servo telemetry must not turn an OPEN gate into CLOSED', () => {
-  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: null, countdownSeconds: null } }), 'OPEN');
-  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: '', countdownSeconds: '' } }), 'OPEN');
-  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: 'bad', countdownSeconds: null } }), 'OPEN');
+  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: null, countdownSeconds: null } }), 'UNKNOWN');
+  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: '', countdownSeconds: '' } }), 'UNKNOWN');
+  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: 'bad', countdownSeconds: null } }), 'UNKNOWN');
   assert.equal(normalizeGate({ gate: { angle: null, countdownSeconds: null } }), 'UNKNOWN');
   assert.equal(normalizeGate({ gate: { status: 'CLOSED', angle: 0, countdownSeconds: null } }), 'CLOSED');
   assert.equal(normalizeGate({ gate: { status: 'OPENING_WARNING', angle: null, countdownSeconds: 5 } }), 'COUNTDOWN');
