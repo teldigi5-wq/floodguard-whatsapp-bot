@@ -1,7 +1,12 @@
 const { getSubscribers, subscribe, unsubscribe, getState, saveState } = require('./store');
 const { assessDeliveryState } = require('./deliveryRecovery');
 
-const STALE_AFTER_MS = Number(process.env.FLOODGUARD_STALE_MS || 15000);
+// An invalid freshness window must never turn historical telemetry into LIVE.
+// Configuration is bounded; malformed or unsafe values fail closed (all stale).
+const configuredStaleAfterMs = Number(process.env.FLOODGUARD_STALE_MS ?? 15000);
+const STALE_AFTER_MS = Number.isSafeInteger(configuredStaleAfterMs) &&
+  configuredStaleAfterMs >= 1000 && configuredStaleAfterMs <= 60000
+    ? configuredStaleAfterMs : null;
 
 const v = (x, suffix = '') =>
   x === undefined || x === null || x === '' ? 'NOT AVAILABLE' : `${x}${suffix}`;
@@ -166,7 +171,7 @@ function fieldTimeMs(live, now = Date.now()) {
 function isStale(live) {
   const now = Date.now();
   const ts = fieldTimeMs(live, now);
-  return ts === null || now - ts > STALE_AFTER_MS;
+  return STALE_AFTER_MS === null || ts === null || now - ts > STALE_AFTER_MS;
 }
 
 function ageText(live) {
