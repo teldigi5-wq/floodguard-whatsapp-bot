@@ -10,5 +10,5 @@ test('package and lockfile agree on Brotli-patched supported Node lines', () => 
   assert.equal(pkg.engines.node, minimum);
   assert.equal(lock.packages[''].engines.node, minimum);
   assert.equal(readFileSync('.nvmrc', 'utf8').trim(), '22.23.4');
-  assert.match(readFileSync('.npmrc', 'utf8'), /^engine-strict=true\\n?$/);
+  assert.equal(readFileSync('.npmrc', 'utf8').trim(), 'engine-strict=true');
 });
