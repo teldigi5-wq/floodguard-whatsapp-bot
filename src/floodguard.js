@@ -124,7 +124,8 @@ function level(live) {
   // enough to assert a safe water level or announce recovery.
   if (s === 'SAFE') return 'UNKNOWN';
   if (['WARNING', 'DANGER'].includes(s)) return s;
-  if (s === 'SENSOR_ERROR' || s === 'ERROR') return 'SENSOR_ERROR';
+  if (['SENSOR_ERROR', 'ERROR', 'INVALID', 'OFFLINE', 'UNAVAILABLE',
+       'DISCONNECTED', 'NOT_INSTALLED', 'REMOVED'].includes(s)) return 'SENSOR_ERROR';
   return 'UNKNOWN';
 }
 
@@ -436,6 +437,11 @@ async function processLiveChangeSerial(sock, live) {
   const stale = isStale(live);
   const sourceAt = fieldTimeMs(live);
   let state = getState();
+  // Once a sensor fault has been reported, an UNKNOWN reading cannot prove
+  // that the fault has recovered. Only valid numeric evidence clears the
+  // durable fault-notification latch.
+  const sensorFaultActive = sensorFault ||
+    (state.sensorFaultActive === true && waterLevelCm(live) === null);
   // SSE children can reconnect and deliver valid observations out of order.
   // Serialize processing AND reject field timestamps older than the most
   // recent persisted observation to prevent false SAFE recovery.
@@ -475,7 +481,7 @@ async function processLiveChangeSerial(sock, live) {
     saveState({
       ...state, lastObservedLevel: currentLevel, lastSeenAt: Date.now(),
       lastSourceAt: sourceAt ?? state.lastSourceAt, dataStale: false,
-      sensorFaultActive: sensorFault,
+      sensorFaultActive,
       deliveryDegraded: true
     });
     return;
@@ -492,7 +498,7 @@ async function processLiveChangeSerial(sock, live) {
       lastSeenAt: Date.now(),
       lastSourceAt: sourceAt,
       dataStale: false,
-      sensorFaultActive: sensorFault
+      sensorFaultActive
     });
     return;
   }
@@ -509,7 +515,7 @@ async function processLiveChangeSerial(sock, live) {
         ...state, initialized: true, level: currentLevel,
         gateStatus: currentGate, lastObservedLevel: currentLevel,
         lastSeenAt: failedAt, lastSourceAt: sourceAt, dataStale: false,
-        sensorFaultActive: sensorFault,
+        sensorFaultActive,
         alertSendFailureCount:
           (Number.isSafeInteger(state.alertSendFailureCount) &&
            state.alertSendFailureCount >= 0 ? state.alertSendFailureCount : 0) +
@@ -605,7 +611,7 @@ async function processLiveChangeSerial(sock, live) {
     deliveryDegraded: failedSends > 0 || state.deliveryDegraded === true,
     lastDeliveryFailureAt: failedSends > 0 ? Date.now() : state.lastDeliveryFailureAt,
     dataStale: false,
-    sensorFaultActive: sensorFault
+    sensorFaultActive
   });
 }
 
