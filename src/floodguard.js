@@ -21,17 +21,43 @@ function normalizeDevice(x) {
 }
 
 function normalizeGate(live) {
-  // Do not coerce null or blank telemetry into physical position zero.
+  // Controller state is NOT a physical proof. An old angle can contradict
+  // a newer status when Firebase child updates arrive separately. Never
+  // infer CLOSED from angle zero while the controller reports OPEN.
   const angle = sensorNumber(live?.gate?.angle);
   const countdown = sensorNumber(live?.gate?.countdownSeconds);
-  let raw = upper(live?.gate?.status);
+  const reported = upper(live?.gate?.status);
+  const raw = reported === 'OPENING_WARNING' ? 'COUNTDOWN' : reported;
+  const angleValid = angle !== null && angle >= 0 && angle <= 90;
+  const countdownValid = countdown === null ||
+    (Number.isInteger(countdown) && countdown >= 0 && countdown <= 10);
 
-  if (raw === 'OPENING_WARNING') raw = 'COUNTDOWN';
-  if (Number.isFinite(countdown) && countdown > 0) return 'COUNTDOWN';
-  if (Number.isFinite(angle) && angle >= 80) return 'OPEN';
-  if (Number.isFinite(angle) && angle <= 2) return 'CLOSED';
-  if (['CLOSED', 'COUNTDOWN', 'OPEN'].includes(raw)) return raw;
+  if (!countdownValid || (angle !== null && !angleValid)) return 'UNKNOWN';
+  if (raw === 'COUNTDOWN') {
+    return countdown !== null && countdown > 0 ? 'COUNTDOWN' : 'UNKNOWN';
+  }
+  // Positive countdown with an explicitly OPEN or CLOSED status indicates a
+  // partial update; it is NOT a verified movement or countdown.
+  if (countdown !== null && countdown > 0) return 'UNKNOWN';
+  if (raw === 'OPEN') {
+    return angle === null || angle >= 80 ? 'OPEN' : 'UNKNOWN';
+  }
+  if (raw === 'CLOSED') {
+    return angle === null || angle <= 10 ? 'CLOSED' : 'UNKNOWN';
+  }
+  // Angle alone cannot establish a physical gate transition.
   return 'UNKNOWN';
+}
+
+function consistentGatePosition(live, target) {
+  const angle = sensorNumber(live?.gate?.angle);
+  const raw = upper(live?.gate?.status);
+  if (angle === null || !Number.isInteger(angle) ||
+      angle < 0 || angle > 90 ||
+      normalizeGate(live) !== target) return false;
+  if (target === 'OPEN') return raw === 'OPEN' && angle >= 80;
+  if (target === 'CLOSED') return raw === 'CLOSED' && angle <= 10;
+  return false;
 }
 
 const WATER_SENSOR_TO_BOTTOM_CM = Number(process.env.WATER_SENSOR_TO_BOTTOM_CM || 25);
@@ -527,19 +553,22 @@ async function processLiveChangeSerial(sock, live) {
     }
   }
 
-  if (currentGate === 'OPEN' && previousGate !== 'OPEN') {
+  if (currentGate === 'OPEN' && previousGate !== 'OPEN' &&
+      consistentGatePosition(live, 'OPEN')) {
     await sendAlert( `🚧 *FLOODGUARD DAM GATE OPEN*\n\nThe prototype dam gate is OPEN.\n\n📐 Servo Angle: ${v(live?.gate?.angle, '°')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: ${currentLevel}\n🛡️ Risk: ${risk(live)}`);
     procedureId = null;
     sentCountdown = [];
   }
 
-  if (procedureId && currentGate === 'CLOSED' && currentLevel !== 'DANGER') {
+  if (procedureId && currentGate === 'CLOSED' && currentLevel !== 'DANGER' &&
+      consistentGatePosition(live, 'CLOSED')) {
     await sendAlert( `✅ *GATE OPENING CANCELLED*\n\nThe countdown ended because the confirmed water state changed.\n\n🚧 Gate: CLOSED\n💧 Water: ${currentLevel}`);
     procedureId = null;
     sentCountdown = [];
   }
 
-  if (previousGate === 'OPEN' && currentGate === 'CLOSED') {
+  if (previousGate === 'OPEN' && currentGate === 'CLOSED' &&
+      consistentGatePosition(live, 'CLOSED')) {
     await sendAlert( `🔒 *DAM GATE CLOSED*\n\nThe prototype gate has returned to 0°.\n\n💧 Water: ${currentLevel}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}`);
   }
 
@@ -567,6 +596,7 @@ module.exports = {
   processLiveChange,
   stats,
   normalizeGate,
+  consistentGatePosition,
   normalizeDevice,
   level,
   waterLevelCm,
