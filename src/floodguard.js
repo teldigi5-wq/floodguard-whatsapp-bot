@@ -556,21 +556,21 @@ async function processLiveChangeSerial(sock, live) {
 
   if (currentGate === 'OPEN' && previousGate !== 'OPEN' &&
       consistentGatePosition(live, 'OPEN')) {
-    await sendAlert( `🚧 *FLOODGUARD DAM GATE OPEN*\n\nThe prototype dam gate is OPEN.\n\n📐 Servo Angle: ${v(live?.gate?.angle, '°')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: ${currentLevel}\n🛡️ Risk: ${risk(live)}`);
+    await sendAlert( `🚧 *FLOODGUARD DAM GATE OPEN*\n\nController reports the prototype dam gate OPEN. Physical position is not independently verified.\n\n📐 Servo Angle: ${v(live?.gate?.angle, '°')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: ${currentLevel}\n🛡️ Risk: ${risk(live)}`);
     procedureId = null;
     sentCountdown = [];
   }
 
   if (procedureId && currentGate === 'CLOSED' && currentLevel !== 'DANGER' &&
       consistentGatePosition(live, 'CLOSED')) {
-    await sendAlert( `✅ *GATE OPENING CANCELLED*\n\nThe countdown ended because the confirmed water state changed.\n\n🚧 Gate: CLOSED\n💧 Water: ${currentLevel}`);
+    await sendAlert( `✅ *GATE OPENING CANCELLED*\n\nThe controller reports CLOSED and the countdown has ended. Physical gate closure is not independently verified.\n\n🚧 Gate: CLOSED\n💧 Water: ${currentLevel}`);
     procedureId = null;
     sentCountdown = [];
   }
 
   if (previousGate === 'OPEN' && currentGate === 'CLOSED' &&
       consistentGatePosition(live, 'CLOSED')) {
-    await sendAlert( `🔒 *DAM GATE CLOSED*\n\nThe prototype gate has returned to 0°.\n\n💧 Water: ${currentLevel}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}`);
+    await sendAlert( `🔒 *DAM GATE CLOSED*\n\nController reports gate CLOSED near 0°. Physical closure is not independently verified.\n\n💧 Water: ${currentLevel}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}`);
   }
 
   saveState({
