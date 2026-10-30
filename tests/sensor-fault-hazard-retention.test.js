@@ -69,8 +69,14 @@ test('OFFLINE during WARNING preserves hazard; invalid echo cannot clear it', as
 
   await processLiveChange(sock, reading(400, 'SAFE', now - 2000));
   assert.equal(getState().level, 'WARNING');
-  assert.equal(getState().sensorFaultActive, false);
+  assert.equal(getState().sensorFaultActive, true,
+    'unverified telemetry cannot clear a reported sensor failure');
   assert.equal(messages.length, 1);
+
+  await processLiveChange(sock, reading(25, 'OFFLINE', now - 1500));
+  assert.equal(getState().level, 'WARNING');
+  assert.equal(messages.length, 1,
+    'repeat fault after unknown reading must not notify repeatedly');
 
   await processLiveChange(sock, reading(25, 'SAFE', now - 1000));
   assert.equal(getState().level, 'SAFE');
