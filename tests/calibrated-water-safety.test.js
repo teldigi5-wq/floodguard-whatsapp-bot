@@ -68,3 +68,31 @@ test('offline virtual recovery planner requires installation-bounded evidence',(
   assert.equal(actual.accepted,true);
   assert.equal(actual.alert?.phase,'SAFE');
 });
+
+test('zero air gap cannot authorize a SAFE recovery without calibration evidence',()=>{
+  const now=Date.now();
+  const zero=observed(0,'SAFE','LOW',now-1000);
+  assert.equal(waterLevelCm(zero),null);
+  assert.equal(level(zero),'UNKNOWN');
+  assert.equal(risk(zero),'UNKNOWN');
+  const proposed=planVirtualWaterSnapshot({
+    live:zero,previous:{topic:'water',phase:'DANGER',sourceAt:now-3000},now
+  });
+  assert.equal(proposed.accepted,false);
+  assert.equal(proposed.alert,null);
+});
+
+test('a zero reading must not erase an independently reported DANGER label',()=>{
+  const now=Date.now();
+  const zeroDanger=observed(0,'DANGER','CRITICAL',now-1000);
+  assert.equal(waterLevelCm(zeroDanger),null);
+  assert.equal(level(zeroDanger),'DANGER');
+  assert.equal(risk(zeroDanger),'CRITICAL');
+  // A categorical hazard may remain visible, but a numeric zero alone
+  // cannot authorize an automated recovery or physical gate conclusion.
+  const proposed=planVirtualWaterSnapshot({
+    live:zeroDanger,previous:{topic:'water',phase:'DANGER',sourceAt:now-3000},now
+  });
+  assert.equal(proposed.accepted,false);
+  assert.equal(proposed.alert,null);
+});
