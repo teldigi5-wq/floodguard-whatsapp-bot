@@ -428,7 +428,9 @@ function processLiveChange(sock, live) {
 async function processLiveChangeSerial(sock, live) {
   if (!live) return;
 
-  let currentLevel = level(live);
+  const observedLevel = level(live);
+  const sensorFault = observedLevel === 'SENSOR_ERROR';
+  let currentLevel = observedLevel;
   const currentGate = normalizeGate(live);
   const countdown = Number(live?.gate?.countdownSeconds);
   const stale = isStale(live);
@@ -441,7 +443,8 @@ async function processLiveChangeSerial(sock, live) {
   if (sourceAt !== null && sourceAt < lastSourceAt) return;
   // Preserve the previous confirmed danger/warning state if this update is
   // missing its physical reading; only verified measurements clear it.
-  if (currentLevel === 'UNKNOWN' && waterLevelCm(live) === null &&
+  if ((currentLevel === 'UNKNOWN' || sensorFault) &&
+      waterLevelCm(live) === null &&
       ['WARNING', 'DANGER'].includes(state.level)) {
     currentLevel = state.level;
   }
@@ -472,6 +475,7 @@ async function processLiveChangeSerial(sock, live) {
     saveState({
       ...state, lastObservedLevel: currentLevel, lastSeenAt: Date.now(),
       lastSourceAt: sourceAt ?? state.lastSourceAt, dataStale: false,
+      sensorFaultActive: sensorFault,
       deliveryDegraded: true
     });
     return;
@@ -487,7 +491,8 @@ async function processLiveChangeSerial(sock, live) {
       sentCountdown: [],
       lastSeenAt: Date.now(),
       lastSourceAt: sourceAt,
-      dataStale: false
+      dataStale: false,
+      sensorFaultActive: sensorFault
     });
     return;
   }
@@ -504,6 +509,7 @@ async function processLiveChangeSerial(sock, live) {
         ...state, initialized: true, level: currentLevel,
         gateStatus: currentGate, lastObservedLevel: currentLevel,
         lastSeenAt: failedAt, lastSourceAt: sourceAt, dataStale: false,
+        sensorFaultActive: sensorFault,
         alertSendFailureCount:
           (Number.isSafeInteger(state.alertSendFailureCount) &&
            state.alertSendFailureCount >= 0 ? state.alertSendFailureCount : 0) +
@@ -522,6 +528,13 @@ async function processLiveChangeSerial(sock, live) {
   let sentCountdown = Array.isArray(state.sentCountdown) ? state.sentCountdown : [];
   let lastEventKey = state.lastEventKey || '';
 
+  // Sensor-health changes are distinct from flood-level transitions.
+  // Persist the fault latch so repeated SSE callbacks or process restarts
+  // cannot generate duplicate sensor-failure notifications.
+  if (sensorFault && state.sensorFaultActive !== true) {
+    await sendAlert('⚠️ *FLOODGUARD SENSOR ALERT*\n\nThe water sensor is not providing a valid reading. Previously reported WARNING or DANGER is NOT cleared by this fault. Do not treat the reservoir as safe; use supervised checks.');
+  }
+
   if (previousLevel !== currentLevel) {
     const key = eventKey('level', live, `${previousLevel}->${currentLevel}`);
     if (key !== lastEventKey) {
@@ -531,8 +544,6 @@ async function processLiveChangeSerial(sock, live) {
         await sendAlert( `🚨 *FLOODGUARD DANGER*\n\nCritical water level detected.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: DANGER\n🛡️ Risk: ${risk(live)}\n🚨 Alarm: ${boolText(live?.alarm?.active)}\n\nFloodGuard is monitoring the gate-opening sequence.`);
       } else if (currentLevel === 'SAFE' && ['WARNING', 'DANGER'].includes(previousLevel)) {
         await sendAlert( `✅ *FLOODGUARD RECOVERY*\n\nWater conditions have returned to SAFE.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: ${currentGate}\n🛡️ Risk: ${risk(live)}`);
-      } else if (currentLevel === 'SENSOR_ERROR') {
-        await sendAlert( '⚠️ *FLOODGUARD SENSOR ALERT*\n\nThe water sensor is not providing a valid reading. FloodGuard will not fabricate a water level.');
       }
       lastEventKey = key;
     }
@@ -593,7 +604,8 @@ async function processLiveChangeSerial(sock, live) {
         ? state.alertSendFailureCount : 0) + failedSends,
     deliveryDegraded: failedSends > 0 || state.deliveryDegraded === true,
     lastDeliveryFailureAt: failedSends > 0 ? Date.now() : state.lastDeliveryFailureAt,
-    dataStale: false
+    dataStale: false,
+    sensorFaultActive: sensorFault
   });
 }
 
