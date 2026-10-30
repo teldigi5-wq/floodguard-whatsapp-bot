@@ -120,9 +120,9 @@ test('sensor out-of-range or explicitly null distance cannot fake safety', async
 });
 
 test('unknown servo telemetry must not turn an OPEN gate into CLOSED', () => {
-  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: null, countdownSeconds: null } }), 'OPEN');
-  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: '', countdownSeconds: '' } }), 'OPEN');
-  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: 'bad', countdownSeconds: null } }), 'OPEN');
+  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: null, countdownSeconds: null } }), 'UNKNOWN');
+  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: '', countdownSeconds: '' } }), 'UNKNOWN');
+  assert.equal(normalizeGate({ gate: { status: 'OPEN', angle: 'bad', countdownSeconds: null } }), 'UNKNOWN');
   assert.equal(normalizeGate({ gate: { angle: null, countdownSeconds: null } }), 'UNKNOWN');
   assert.equal(normalizeGate({ gate: { status: 'CLOSED', angle: 0, countdownSeconds: null } }), 'CLOSED');
   assert.equal(normalizeGate({ gate: { status: 'OPENING_WARNING', angle: null, countdownSeconds: 5 } }), 'COUNTDOWN');
