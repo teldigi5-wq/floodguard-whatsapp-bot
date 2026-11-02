@@ -40,3 +40,9 @@ Inspectors output fixed redacted statuses, not private subscriber IDs or WhatsAp
 **Stop conditions:** a previously recorded missing file, uncertain send, blocked inspector, corrupt storage, unknown/unverified field conditions, unintended parent Firebase read/write, failed Android CI, missing private backup, or unavailable manual-warning channel. During any suspected real hazard, follow the approved independent/manual warning process rather than trusting unverified automation.
 
 **Zero mandatory paid services.** Do not re-enable inaccessible AWS infrastructure or procure a new paid host without the owner's approval.
+
+## 2 November 2026 — draft integration of recovery and patched Node runtime
+
+The new review branch is stacked on bot PR #67 exact head `24fe854522b7c9530f62fb57a5a29a3bef7dcaf5` and carries PR #68's Node runtime safety policy without dropping PR #67's state-bootstrap, subscriber inspection, alert recovery or extended syntax-check scripts. Node engine and package-lock root now match the reviewed patched 22.23.4 / 24.22.1 / 26.12.1 families. Existing CI is extended to the integration branch and PR #67 base for exact-head verification. Neither original PR is merged or changed.
+
+**Not live acceptance:** engine constraints and CI do not upgrade a deployed Node binary. Host/runtime provenance, replacement hosting, live WhatsApp consent, private session backup, actual receipt/delivery and field Firebase/ESP/UNO states remain UNVERIFIED. Never pair a phone, start production sends, restore historical AWS, change Firebase Rules or operate the physical gate from this draft. Production **NO-GO**.
