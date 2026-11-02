@@ -2,9 +2,9 @@ name: FloodGuard CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, integration/floodguard-alert-runtime-floor-20261102]
   pull_request:
-    branches: [main]
+    branches: [main, integration/floodguard-alert-recovery-consolidated-20261027]
   workflow_dispatch: {}
 
 concurrency:
