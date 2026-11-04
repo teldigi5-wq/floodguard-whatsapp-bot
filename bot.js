@@ -1,3 +1,24 @@
+'use strict';
+
+// Active CommonJS production entrypoint. Until the sensor signer, durable
+// independent H11 witness, release custody and manual warning fallback are
+// accepted in a real environment, no WhatsApp connection or automatic alert
+// dispatch may begin. This runs before dotenv, session directories, Firebase,
+// HTTP listener, QR pairing or any network-capable module is imported.
+const { liveOperationDecision } = require('./src/operationalAuthority');
+const authority = liveOperationDecision();
+if (authority.releaseDecision !== 'GO' ||
+    authority.operationalStartupAllowed !== true ||
+    authority.automaticAlertsAllowed !== true ||
+    authority.sourceIdentityAuthenticated !== true ||
+    authority.independentWitnessVerified !== true ||
+    authority.approvedFallbackRecorded !== true) {
+  console.error('FloodGuard operational startup blocked: ' +
+    'unsigned telemetry and independent authority/release gates not accepted. ' +
+    'Use the approved manual warning procedure.');
+  process.exit(78);
+}
+
 require('dotenv').config();
 const express = require('express');
 const QRCode = require('qrcode');
