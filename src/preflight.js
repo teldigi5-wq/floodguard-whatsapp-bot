@@ -70,11 +70,14 @@ function inspectConfig(env, options={}) {
     }
   }
 
-  const threshold=Number(env.FLOODGUARD_STALE_MS || '15000');
-  if(Number.isFinite(threshold)&&threshold>=1000&&threshold<=300000)
-    add('pass','stale-threshold','Telemetry stale-data threshold is within expected bounds.');
+  // Match the active floodguard.js runtime exactly. "Passed preflight" must
+  // not mask a fractional/empty/overlong value that the runtime rejects and
+  // treats as entirely stale. Missing (nullish) values use the 15 s default.
+  const threshold=Number(env.FLOODGUARD_STALE_MS ?? '15000');
+  if(Number.isSafeInteger(threshold)&&threshold>=1000&&threshold<=60000)
+    add('pass','stale-threshold','Telemetry stale-data threshold is within runtime bounds.');
   else
-    add('fail','stale-threshold','Use a stale-data threshold between 1000 and 300000 milliseconds.');
+    add('fail','stale-threshold','Use a whole-millisecond stale-data threshold between 1000 and 60000.');
 
   return Object.freeze({entries,ok:!entries.some(x=>x.kind==='fail')});
 }

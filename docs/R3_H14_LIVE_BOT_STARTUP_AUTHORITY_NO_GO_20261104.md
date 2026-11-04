@@ -28,3 +28,21 @@ This gate is not an endorsement to simply flip a boolean to `true`. Allowing sta
 - Open real-world R3 release gates: effective Rules and IAM, signer/witness custody, durable confirmation, revocation and rollback-resistant recovery, field TLS and power recovery, cross-client delivery, supervised physical safety and owner authorization.
 
 **NO-GO.**
+
+## H14 follow-up — preflight/runtime freshness contract parity (4 November)
+
+Independent code review found that the prior offline `inspectConfig` accepted
+fractional values and up to `300000` milliseconds while the active alert
+runtime accepts only **safe integers between 1000 and 60000 milliseconds**,
+defaulting to 15000 when the variable is missing. This could produce a false
+preflight PASS even though the runtime deliberately treats every observation as
+STALE. The same existing draft now aligns the preflight with the runtime
+without changing any runtime safety threshold, re-enabling bot startup or
+modifying a production configuration. Synthetic boundary tests cover both
+accepted endpoints, default/null, oversized, empty, fractional and invalid
+inputs.
+
+The mobile client uses a distinct 30-second freshness warning threshold.
+That difference is not evidence of source authentication or a release gate.
+Firmware timestamps and cross-client data propagation still require real
+hardware and phone acceptance; no threshold was silently unified.

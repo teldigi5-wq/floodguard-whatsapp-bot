@@ -64,3 +64,22 @@ test('private values and paths are never exposed in CLI report',()=>withDir(dir=
   const result=formatReport(inspectConfig(source,{cwd:dir,nodeVersion:'22.23.4'}));
   for(const value of [secret,dir,source.FIREBASE_DATABASE_URL,source.FIREBASE_AUTH])assert.ok(!result.includes(value));
 }));
+
+test('preflight accepts only the active runtime freshness window, including default',()=>withDir(dir=>{
+  for(const value of [undefined,null,'1000','15000','30000','60000']){
+    const config={...good(dir),FLOODGUARD_STALE_MS:value};
+    const report=inspectConfig(config,{cwd:dir,nodeVersion:'22.23.4'});
+    assert.equal(status(report,'stale-threshold'),'pass',String(value));
+    assert.equal(report.ok,true,formatReport(report));
+  }
+}));
+test('preflight rejects fresh-looking values that runtime would treat as all-stale',()=>withDir(dir=>{
+  for(const value of ['', ' ', '0','999','60001','300000','1.5',
+    '1000.5','15000.5','NaN','Infinity','-10','99999999999999999']){
+    const report=inspectConfig({...good(dir),FLOODGUARD_STALE_MS:value},
+      {cwd:dir,nodeVersion:'22.23.4'});
+    assert.equal(status(report,'stale-threshold'),'fail',String(value));
+    assert.equal(report.ok,false,String(value));
+    assert.match(formatReport(report),/whole-millisecond.*1000 and 60000/);
+  }
+}));
