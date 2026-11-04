@@ -509,8 +509,16 @@ async function processLiveChangeSerial(sock, live) {
   // Persist an aggregate failure signal; this is not a retry or
   // confirmation that a remote device received earlier messages.
   let failedSends = 0;
+  // H13: live Firebase child reports are unsigned. Every automated
+  // notification must retain this provenance warning. The timestamp, app
+  // calculation, and controller-reported angle are not physical attestation.
+  const unsignedSourceNotice =
+    '\n\n⚠️ *SOURCE UNVERIFIED*\nThis alert is derived from unsigned ' +
+    'Firebase telemetry. Sensor identity, current field conditions and ' +
+    'physical gate position are not independently verified. Follow the ' +
+    'approved independent/manual safety procedure.';
   const sendAlert = async text => {
-    const outcome = await sendAll(sock, text);
+    const outcome = await sendAll(sock, text + unsignedSourceNotice);
     failedSends += outcome.failures;
     if (outcome.uncertain) {
       const failedAt = Date.now();
@@ -548,11 +556,11 @@ async function processLiveChangeSerial(sock, live) {
     const key = eventKey('level', live, `${previousLevel}->${currentLevel}`);
     if (key !== lastEventKey) {
       if (currentLevel === 'WARNING') {
-        await sendAlert( `🟡 *FLOODGUARD WARNING*\n\nWater has entered the warning zone.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n💧 Status: WARNING\n🛡️ Risk: ${risk(live)}\n🚧 Gate: ${currentGate}`);
+        await sendAlert( `🟡 *FLOODGUARD WARNING*\n\nUnsigned telemetry reports a possible warning-zone water level.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n💧 Status: WARNING\n🛡️ Risk: ${risk(live)}\n🚧 Gate: ${currentGate}`);
       } else if (currentLevel === 'DANGER') {
-        await sendAlert( `🚨 *FLOODGUARD DANGER*\n\nCritical water level detected.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: DANGER\n🛡️ Risk: ${risk(live)}\n🚨 Alarm: ${boolText(live?.alarm?.active)}\n\nFloodGuard is monitoring the gate-opening sequence.`);
+        await sendAlert( `🚨 *FLOODGUARD DANGER*\n\nUnsigned telemetry reports a possible critical water level.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🔴 Water: DANGER\n🛡️ Risk: ${risk(live)}\n🚨 Alarm: ${boolText(live?.alarm?.active)}\n\nA controller countdown report does not confirm physical gate movement.`);
       } else if (currentLevel === 'SAFE' && ['WARNING', 'DANGER'].includes(previousLevel)) {
-        await sendAlert( `✅ *FLOODGUARD RECOVERY*\n\nWater conditions have returned to SAFE.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: ${currentGate}\n🛡️ Risk: ${risk(live)}`);
+        await sendAlert( `⚠️ *FLOODGUARD RECOVERY REPORT — NOT AN ALL-CLEAR*\n\nUnsigned sensor data now reports SAFE. This is NOT a verified all-clear. Keep independent warnings and manual checks active until an authorized field operator confirms conditions.\n\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: ${currentGate}\n🛡️ Risk: ${risk(live)}`);
       }
       lastEventKey = key;
     }
@@ -561,7 +569,7 @@ async function processLiveChangeSerial(sock, live) {
   if (opening(live) && !procedureId) {
     procedureId = `gate-${Number(live?.system?.lastUpdate) || Date.now()}`;
     sentCountdown = [];
-    await sendAlert( `🚨 *DAM GATE OPENING WARNING*\n\nThe DANGER condition has started the gate countdown.\n\n⏱️ Opening in: ${v(countdown, ' seconds')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: COUNTDOWN`);
+    await sendAlert( `🚨 *DAM GATE OPENING WARNING*\n\nUnsigned controller telemetry reports a countdown during a DANGER water reading. Physical gate movement is unverified.\n\n⏱️ Opening in: ${v(countdown, ' seconds')}\n💧 Water Level: ${v(waterLevelCm(live), ' cm')}\n🚧 Gate: COUNTDOWN`);
   }
 
   // Current physical countdown is 10 seconds, so send useful milestones only.
