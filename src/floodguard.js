@@ -187,10 +187,13 @@ function ageText(live) {
   return `${Math.floor(min / 60)}h ago`;
 }
 
+// A recent field clock is only a freshness claim from the unsigned RTDB.
+// Neither "LIVE" nor a green icon can establish sensor authenticity, a
+// certified SAFE decision, gate actuation, or real alert delivery.
 function freshnessLine(live) {
   return isStale(live)
-    ? `⚠️ Data: STALE (${ageText(live)})`
-    : `🟢 Data: LIVE (${ageText(live)})`;
+    ? `⚠️ Data: STALE · SOURCE UNVERIFIED (${ageText(live)})`
+    : `⚠️ Data: RECENT REPORT · SOURCE UNVERIFIED (${ageText(live)})`;
 }
 
 function boolText(value) {
@@ -222,7 +225,7 @@ const menu = () => `🌊 *FLOODGUARD BOT*
 
 Real-time Flood Monitoring & Dam Gate Alerts
 
-📊 *stats* — complete live summary
+📊 *stats* — reported sensor summary
 💧 *water* — water distance/status
 🛡️ *risk* — flood risk
 🚧 *gate* — gate state/countdown
@@ -265,7 +268,7 @@ function stats(live) {
   const gateExtra = !isStale(live) && gate === 'COUNTDOWN' && Number.isFinite(countdown) && countdown > 0
     ? ` (${countdown}s)` : '';
 
-  return `🌊 *FLOODGUARD ${isStale(live) ? 'LAST RECORDED STATS' : 'LIVE STATS'}*
+  return `🌊 *FLOODGUARD ${isStale(live) ? 'LAST RECORDED STATS' : 'REPORTED STATS'}*
 
 ${freshnessLine(live)}
 
