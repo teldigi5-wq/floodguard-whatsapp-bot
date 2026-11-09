@@ -29,3 +29,9 @@ Primary: https://github.com/teldigi5-wq
 Education/test mirror: https://github.com/IT26101524
 Canonical Aetheris: https://github.com/teldigi5-wq/aetheris-platform
 Canonical Runtime: https://github.com/teldigi5-wq/aetheris-ai-runtime
+
+## Companion planning documents
+- [Dated roadmap and continuation phases](AI_ROADMAP_2026-11-09.md)
+- [Milestones, evidence and blockers](AI_MILESTONES_2026-11-09.md)
+
+Original project roadmaps/stages retained. These proposed files are only on draft PR #73; not every historical branch.
