@@ -180,3 +180,10 @@ Production use requires private credentials, Firebase child-read rules that matc
 - [ ] Record team attributions, real screenshots and a hardware wiring diagram.
 
 FloodGuard is a **prototype and engineering learning project**, not a replacement for official flood forecasts, warnings or life-safety equipment. For security issues, use [SECURITY.md](SECURITY.md).
+
+
+---
+
+## AI/developer continuity — 9 November 2026
+
+For a reliable continuation, read [the source-pinned checkpoint and next milestones](docs/AI_HANDOFF_2026-11-09.md). Source at snapshot: `security/r3-h14-operational-startup-no-go-20261104` / `8f0415b95f60`. Reverify current GitHub and release status; this documentation branch is not a deployment or production authorization.
